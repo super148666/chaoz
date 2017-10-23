@@ -191,7 +191,7 @@ int main(int argc, char **argv) {
     pose = nh.subscribe("robot_pose_ekf/odom_combined", 1000, &poseMessageReceived);
     cout << "subscriber to odom_combined done" << endl;
     ros::Subscriber laser;
-    laser = nh.subscribe("RosAria/sim_lms1xx_1_laserscan", 1000, &laserMessageReceived);
+    laser = nh.subscribe("RosAria/lms1xx_1_laserscan", 1000, &laserMessageReceived);
     cout << "subscriber to laserscan done" << endl;
     StateDisplay displayer;
     msg.linear.x = 0;
