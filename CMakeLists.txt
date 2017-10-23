@@ -36,9 +36,10 @@ generate_dynamic_reconfigure_options(cfg/RosAria.cfg)
 #add_library(${PROJECT_NAME} src/example.cpp)
 #target_link_libraries(${PROJECT_NAME} another_library)
 
+find_package(OpenCV REQUIRED)
 find_package(Boost REQUIRED COMPONENTS thread)
 include_directories(${catkin_INCLUDE_DIRS} ${Boost_INCLUDE_DIRS} )
-
+include_directories(${OpenCV_INCLUDE_DIRS})
 find_package(Aria QUIET)
 if(Aria_FOUND)
 	if(EXISTS "${Aria_INCLUDE_DIRS}/Aria.h")
@@ -56,11 +57,14 @@ else()
 endif()
 
 add_executable(RosAria RosAria.cpp LaserPublisher.cpp)
+add_executable(StateDisplay state_display.cpp state_display.h)
 add_dependencies(RosAria rosaria_gencfg)
 add_dependencies(RosAria rosaria_gencpp)
 
 target_link_libraries(RosAria ${catkin_LIBRARIES} ${Boost_LIBRARIES} Aria pthread dl rt)
+target_link_libraries(StateDisplay ${OpenCV_LIBRARIES})
 set_target_properties(RosAria PROPERTIES COMPILE_FLAGS "-fPIC")
+set_target_properties(StateDisplay PROPERTIES COMPILE_FLAGS "-fPIC")
 #set_target_properties(RosAria PROPERTIES LINK_FLAGS "-Wl")
 
 ## Generate added messages and services with any dependencies listed here
@@ -81,9 +85,11 @@ catkin_package(
 
 ## Mark executables and/or libraries for installation
 install(
-  TARGETS 
-    RosAria
-  ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-  LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-  RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+		TARGETS
+		RosAria
+		StateDisplay
+		ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+		LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+		RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
+
