@@ -27,7 +27,7 @@
 using namespace cv;
 using namespace std;
 
-class Screen2{
+class StateDisplay{
 private:
     Mat MyImage;
     Mat MyBackground;
@@ -47,7 +47,7 @@ private:
     int MyFrontLength = 313;
     int MyHalfWidth = 253;
 public:
-    explicit Screen2();
+    explicit StateDisplay();
     void DisplayImage();
     void DisplayBackground();
     void UpdateSurrounding(double* scan);

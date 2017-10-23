@@ -51,22 +51,23 @@ LaserPublisher::LaserPublisher(ArLaser *_l, ros::NodeHandle& _n, bool _broadcast
   }
   lasertf.setRotation(q);
   
-
+//  laser->setStartDegrees(-90);
+//  laser->setEndDegrees(90);
   laserscan.header.frame_id = "laser_frame";
-  laserscan.angle_min = ArMath::degToRad(laser->getStartDegrees());
-  laserscan.angle_max = ArMath::degToRad(laser->getEndDegrees());
+  laserscan.angle_min = (float)ArMath::degToRad(laser->getStartDegrees());
+  laserscan.angle_max = (float)ArMath::degToRad(laser->getEndDegrees());
   //laserscan.time_increment = ?
   laserscan.range_min = 0; //laser->getMinRange() / 1000.0;
-  laserscan.range_max = laser->getMaxRange() / 1000.0;
+  laserscan.range_max = (float)(laser->getMaxRange() / 1000.0);
   pointcloud.header.frame_id = globaltfname;
-  
+//  laser->setIncrement(1);
   // Get angle_increment of the laser
   laserscan.angle_increment = 0;
   if(laser->canSetIncrement()) {
-    laserscan.angle_increment = laser->getIncrement();
+    laserscan.angle_increment = (float)laser->getIncrement();
   }
   else if(laser->getIncrementChoice() != NULL) {
-    laserscan.angle_increment = laser->getIncrementChoiceDouble();
+    laserscan.angle_increment = (float)laser->getIncrementChoiceDouble();
   }
   assert(laserscan.angle_increment > 0);
   laserscan.angle_increment *= M_PI/180.0;
@@ -110,10 +111,11 @@ void LaserPublisher::publishLaserScan()
       assert(*r);
       
       if ((*r)->getIgnoreThisReading()) {
-	laserscan.ranges[n] = -1;
+	laserscan.ranges[n] = 20.0;
+//        continue;
       }
       else {
-	laserscan.ranges[n] = (*r)->getRange() / 1000.0;
+	laserscan.ranges[n] = (float)((*r)->getRange() / 1000.0);
       }
       
       ++n;
@@ -125,10 +127,10 @@ void LaserPublisher::publishLaserScan()
       assert(*r);
       
       if ((*r)->getIgnoreThisReading()) {
-	laserscan.ranges[n] = -1;
+	laserscan.ranges[n] = 20.0;
       }
       else {
-	laserscan.ranges[n] = (*r)->getRange() / 1000.0;
+	laserscan.ranges[n] = (float)((*r)->getRange() / 1000.0);
       }
       
       ++n;
@@ -150,9 +152,9 @@ void LaserPublisher::publishPointCloud()
   for(std::list<ArPoseWithTime*>::const_iterator i = p->begin(); i != p->end(); ++i)
   {
     assert(*i);
-    pointcloud.points[n].x = (*i)->getX() / 1000.0;
-    pointcloud.points[n].y = (*i)->getY() / 1000.0;
-    pointcloud.points[n].z = (laser->hasSensorPosition() ?  laser->getSensorPositionZ() / 1000.0 : 0.0);
+    pointcloud.points[n].x = (float)((*i)->getX() / 1000.0);
+    pointcloud.points[n].y = (float)((*i)->getY() / 1000.0);
+    pointcloud.points[n].z = laser->hasSensorPosition() ?  (float)(laser->getSensorPositionZ() / 1000.0) : (float)(0.0);
     ++n;
   }
   pointcloud_pub.publish(pointcloud);

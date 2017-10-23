@@ -6,8 +6,11 @@
 //screen.cpp
 
 geometry_msgs::PoseWithCovarianceStamped::_pose_type::_pose_type g_currentPose;
-sensor_msgs::LaserScan::_ranges_type g_scan;
-Screen2::Screen2() {
+double g_scan[181];
+double g_tansVel = 0.0;
+double g_rotVel = 0.0;
+
+StateDisplay::StateDisplay() {
     colorBlack.val[COLOR_BLUE] = 0;
     colorBlack.val[COLOR_GREEN] = 0;
     colorBlack.val[COLOR_RED] = 0;
@@ -24,15 +27,17 @@ Screen2::Screen2() {
     colorGreen.val[COLOR_GREEN] = 255;
     colorGreen.val[COLOR_RED] = 0;
 
-    MyLaserMaxRange = 20000;
+    MyLaserMaxRange = 5000;
     int scaleFactor = 15;
     MyScaleX = MyScaleY = scaleFactor;
+    MyFrontLength /= scaleFactor;
+    MyHalfWidth /= scaleFactor;
     MyRobotPosition = Point((int) (MyLaserMaxRange / MyScaleX),
                             (int) ceil((MyLaserMaxRange + MyLaserOffset) / MyScaleY));
     MyLaserPosition = MyRobotPosition;
     MyLaserPosition.y -= MyLaserOffset / MyScaleY;
-    MyBackground = Mat((int) ((MyLaserMaxRange + MyLaserOffset) / MyScaleY),
-                       (int) (2 * MyLaserMaxRange / MyScaleX), CV_8UC3, Scalar(255, 255, 255));
+    MyBackground = Mat(MyRobotPosition.y+1,
+                       (int) (2 * MyLaserMaxRange / MyScaleX)+1, CV_8UC3, Scalar(255, 255, 255));
     rectangle(MyBackground, Point(MyRobotPosition.x - MyHalfWidth, MyRobotPosition.y),
               Point(MyRobotPosition.x + MyHalfWidth, MyRobotPosition.y - MyFrontLength), Scalar(0, 200, 200), -1);
     circle(MyBackground, MyLaserPosition, MyLaserPosition.x, Scalar(0, 255, 0), 1);
@@ -46,33 +51,34 @@ Screen2::Screen2() {
     namedWindow(MyWindowName, CV_GUI_NORMAL | WINDOW_AUTOSIZE);
 }
 
-void Screen2::DisplayImage() {
+void StateDisplay::DisplayImage() {
     imshow(MyWindowName, MyImage);
     waitKey(10);
     MyImage = MyBackground.clone();
 }
 
-void Screen2::DisplayBackground() {
+void StateDisplay::DisplayBackground() {
     imshow(MyWindowName, MyBackground);
     waitKey(10);
 }
 
-void Screen2::UpdateSurrounding(double* scan) {
+void StateDisplay::UpdateSurrounding(double* scan) {
     Point obstacle[181];
     double radToDegree = RAD_TO_DEGREE;
-    double rad;
+    double rad = 0.0;
     for (int i = 0; i < 181; i++) {
         rad = -i * radToDegree;
-
         if (scan[i] > MyLaserMaxRange) {
             scan[i] = MyLaserMaxRange;
         }
         obstacle[i].x = ((int) (scan[i] * cos(rad) / MyScaleX) + MyLaserPosition.x);
         obstacle[i].y = ((int) (scan[i] * sin(rad) / MyScaleY) + MyLaserPosition.y);
+
+
         if (scan[i] < 500) {
             line(MyImage, MyLaserPosition, obstacle[i], Scalar(0, 0, 255));
         }
-//        MyImage.at<Vec3b>(obstacle[i]) = colorBlack;
+        MyImage.at<Vec3b>(obstacle[i]) = colorBlack;
 
         if (i > 0) {
             if (i < 45 || i > 135) {
@@ -84,25 +90,25 @@ void Screen2::UpdateSurrounding(double* scan) {
             line(MyImage, obstacle[i - 1], obstacle[i], Scalar(0, 0, 0));
         }
     }
-//    double angleStep = robot->getRotVel() * TIME_STEP * DEGREE_TO_RAD;
-//    double lengthStep = robot->getVel() * TIME_STEP;
-//    Point estimatePath;
-//    double angle, length;
-//    for (int i = 1; i < 100; i++) {
-//        angle = angleStep * i;
-//        length = lengthStep * i;
-//        estimatePath = Point(static_cast<int>(sin(-angle) * length / MyScaleX + MyRobotPosition.x),
-//                             static_cast<int>(-cos(angle) * length / MyScaleY + MyRobotPosition.y));
-//        if (estimatePath.y > MyRobotPosition.y) break;
-//        MyImage.at<Vec3b>(estimatePath) = colorBlue;
-//    }
-//    rectangle(MyImage, Point(MyRobotPosition.x - MyHalfWidth, MyRobotPosition.y),
-//              Point(MyRobotPosition.x + MyHalfWidth, MyRobotPosition.y - MyFrontLength), Scalar(0, 200, 200), FILLED);
+    double angleStep = g_rotVel * TIME_STEP * DEGREE_TO_RAD;
+    double lengthStep = g_tansVel * TIME_STEP;
+    Point estimatePath;
+    double angle, length;
+    for (int i = 1; i < 100; i++) {
+        angle = angleStep * i;
+        length = lengthStep * i;
+        estimatePath = Point(static_cast<int>(sin(-angle) * length / MyScaleX + MyRobotPosition.x),
+                             static_cast<int>(-cos(angle) * length / MyScaleY + MyRobotPosition.y));
+        if (estimatePath.y > MyRobotPosition.y) break;
+        MyImage.at<Vec3b>(estimatePath) = colorBlue;
+    }
+    rectangle(MyImage, Point(MyRobotPosition.x - MyHalfWidth, MyRobotPosition.y),
+              Point(MyRobotPosition.x + MyHalfWidth, MyRobotPosition.y - MyFrontLength), Scalar(0, 200, 200), -1);
 
 
 }
 
-int Screen2::SearchFreeSpace(double *scan, double distThres, int countThres) {
+int StateDisplay::SearchFreeSpace(double* scan, double distThres, int countThres) {
     int count = 0;
     int mid = -1;
     int leftMid = -1;
@@ -154,28 +160,40 @@ int Screen2::SearchFreeSpace(double *scan, double distThres, int countThres) {
     return leftMid;
 }
 
-void poseMessageReceived(const geometry_msgs::PoseWithCovarianceStamped& msg)
-{
+void poseMessageReceived(const geometry_msgs::PoseWithCovarianceStamped &msg) {
     g_currentPose = msg.pose.pose;
-    cout<<"pose received"<<endl;
+    cout << "pose received" << endl;
 }
 
-void laserMessageReceived(const sensor_msgs::LaserScan& msg){
-    g_scan = msg.ranges;
-    cout<<"laserscan received"<<endl;
+void laserMessageReceived(const sensor_msgs::LaserScan &msg) {
+    int index = 0;
+    for (int i = 90; i < 451; i=i+2) {
+        index = (i - 90) / 2;
+        g_scan[index] = msg.ranges[i] * 1000.0;
+    }
 }
 
+void velMessageReceived(const geometry_msgs::Twist &msg){
+    g_tansVel = msg.linear.x * 1000.0;
+    g_rotVel = msg.angular.z * 1000.0;
+}
 
-int main(int argc, char** argv){
+int main(int argc, char **argv) {
     ros::init(argc, argv, "state_display");
     ros::NodeHandle nh;
 
-    ros::Publisher pub = nh.advertise<geometry_msgs::Twist>("RosAria/cmd_vel",1000);
+    ros::Publisher pub = nh.advertise<geometry_msgs::Twist>("RosAria/cmd_vel", 1000);
     geometry_msgs::Twist msg;
+    cout << "publisher to cmd_vel done" << endl;
+    ros::Subscriber vel;
+    vel = nh.subscribe("RosAria/com_vel",1000,&velMessageReceived);
     ros::Subscriber pose;
-    pose = nh.subscribe("robot_pose_ekf/odom_combined",1000,&poseMessageReceived);
+    pose = nh.subscribe("robot_pose_ekf/odom_combined", 1000, &poseMessageReceived);
+    cout << "subscriber to odom_combined done" << endl;
     ros::Subscriber laser;
-    laser = nh.subscribe("RosAria/lms1xx_1_laserscan",1000,&laserMessageReceived);
+    laser = nh.subscribe("RosAria/sim_lms1xx_1_laserscan", 1000, &laserMessageReceived);
+    cout << "subscriber to laserscan done" << endl;
+    StateDisplay displayer;
     msg.linear.x = 0;
     msg.linear.y = 0;
     msg.linear.z = 0;
@@ -183,8 +201,32 @@ int main(int argc, char** argv){
     msg.angular.y = 0;
     msg.angular.z = 0;
     pub.publish(msg);
-    cout<<"configure state display done"<<endl;
-    ros::spinOnce();
+    cout << "configure state display done" << endl;
+    int mid;
+    while (ros::ok()) {
+        ros::spinOnce();
+        displayer.UpdateSurrounding(g_scan);
+        mid = displayer.SearchFreeSpace(g_scan,2000,13);
+        cout<<mid<<endl;
+        displayer.DisplayImage();
+        msg.linear.x = 0.4;
+        for(int i=45;i<135;i++){
+            if(g_scan[i]<700){
+                msg.linear.x = 0;
+                break;
+            }
+        }
+        if(mid==-1){
+            msg.angular.z = -90;
+            pub.publish(msg);
+            continue;
+        }
+        mid = (mid-90);
+        msg.angular.z = mid;
+        pub.publish(msg);
+
+
+    }
 
     return (0);
 }
