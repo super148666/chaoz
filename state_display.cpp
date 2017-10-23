@@ -5,7 +5,8 @@
 #include "state_display.h"
 //screen.cpp
 
-
+geometry_msgs::PoseWithCovarianceStamped::_pose_type::_pose_type g_currentPose;
+sensor_msgs::LaserScan::_ranges_type g_scan;
 Screen2::Screen2() {
     colorBlack.val[COLOR_BLUE] = 0;
     colorBlack.val[COLOR_GREEN] = 0;
@@ -33,7 +34,7 @@ Screen2::Screen2() {
     MyBackground = Mat((int) ((MyLaserMaxRange + MyLaserOffset) / MyScaleY),
                        (int) (2 * MyLaserMaxRange / MyScaleX), CV_8UC3, Scalar(255, 255, 255));
     rectangle(MyBackground, Point(MyRobotPosition.x - MyHalfWidth, MyRobotPosition.y),
-              Point(MyRobotPosition.x + MyHalfWidth, MyRobotPosition.y - MyFrontLength), Scalar(0, 200, 200), FILLED);
+              Point(MyRobotPosition.x + MyHalfWidth, MyRobotPosition.y - MyFrontLength), Scalar(0, 200, 200), -1);
     circle(MyBackground, MyLaserPosition, MyLaserPosition.x, Scalar(0, 255, 0), 1);
     putText(MyBackground, "Max Laser Range", Point(2, 10), FONT_HERSHEY_PLAIN, 1, Scalar(0, 0, 0));
     putText(MyBackground, "FreeSpace", Point(2, 20), FONT_HERSHEY_PLAIN, 1, Scalar(0, 0, 0));
@@ -81,10 +82,7 @@ void Screen2::UpdateSurrounding(double* scan) {
                 }
             }
             line(MyImage, obstacle[i - 1], obstacle[i], Scalar(0, 0, 0));
-        }. /opt/ros/lunar/setup.bash
-cd catkin_ws
-. devel/setup.bash
-clion
+        }
     }
 //    double angleStep = robot->getRotVel() * TIME_STEP * DEGREE_TO_RAD;
 //    double lengthStep = robot->getVel() * TIME_STEP;
@@ -156,8 +154,37 @@ int Screen2::SearchFreeSpace(double *scan, double distThres, int countThres) {
     return leftMid;
 }
 
+void poseMessageReceived(const geometry_msgs::PoseWithCovarianceStamped& msg)
+{
+    g_currentPose = msg.pose.pose;
+    cout<<"pose received"<<endl;
+}
+
+void laserMessageReceived(const sensor_msgs::LaserScan& msg){
+    g_scan = msg.ranges;
+    cout<<"laserscan received"<<endl;
+}
+
+
 int main(int argc, char** argv){
-    
+    ros::init(argc, argv, "state_display");
+    ros::NodeHandle nh;
+
+    ros::Publisher pub = nh.advertise<geometry_msgs::Twist>("RosAria/cmd_vel",1000);
+    geometry_msgs::Twist msg;
+    ros::Subscriber pose;
+    pose = nh.subscribe("robot_pose_ekf/odom_combined",1000,&poseMessageReceived);
+    ros::Subscriber laser;
+    laser = nh.subscribe("RosAria/lms1xx_1_laserscan",1000,&laserMessageReceived);
+    msg.linear.x = 0;
+    msg.linear.y = 0;
+    msg.linear.z = 0;
+    msg.angular.x = 0;
+    msg.angular.y = 0;
+    msg.angular.z = 0;
+    pub.publish(msg);
+    cout<<"configure state display done"<<endl;
+    ros::spinOnce();
 
     return (0);
 }

@@ -62,7 +62,7 @@ add_dependencies(RosAria rosaria_gencfg)
 add_dependencies(RosAria rosaria_gencpp)
 
 target_link_libraries(RosAria ${catkin_LIBRARIES} ${Boost_LIBRARIES} Aria pthread dl rt)
-target_link_libraries(StateDisplay ${OpenCV_LIBRARIES})
+target_link_libraries(StateDisplay ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} Aria pthread dl rt)
 set_target_properties(RosAria PROPERTIES COMPILE_FLAGS "-fPIC")
 set_target_properties(StateDisplay PROPERTIES COMPILE_FLAGS "-fPIC")
 #set_target_properties(RosAria PROPERTIES LINK_FLAGS "-Wl")
@@ -87,6 +87,12 @@ catkin_package(
 install(
 		TARGETS
 		RosAria
+		ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+		LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+		RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+)
+install(
+		TARGETS
 		StateDisplay
 		ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
 		LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}

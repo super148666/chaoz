@@ -498,6 +498,7 @@ int RosAriaNode::Setup()
     {
       ArLaser *l = i->second;
       int ln = i->first;
+      std::cout<<"laser "<<ln<<" name: "<<l->getName()<<std::endl;
       std::string tfname("laser");
       if(lasers->size() > 1 || ln > 1) // no number if only one laser which is also laser 1
         tfname += ln; 
