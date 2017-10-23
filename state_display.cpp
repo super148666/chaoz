@@ -162,7 +162,7 @@ int StateDisplay::SearchFreeSpace(double* scan, double distThres, int countThres
 
 void poseMessageReceived(const geometry_msgs::PoseWithCovarianceStamped &msg) {
     g_currentPose = msg.pose.pose;
-    cout << "pose received" << endl;
+//    cout << "pose received" << endl;
 }
 
 void laserMessageReceived(const sensor_msgs::LaserScan &msg) {
@@ -173,9 +173,9 @@ void laserMessageReceived(const sensor_msgs::LaserScan &msg) {
     }
 }
 
-void velMessageReceived(const geometry_msgs::Twist &msg){
-    g_tansVel = msg.linear.x * 1000.0;
-    g_rotVel = msg.angular.z * 1000.0;
+void velMessageReceived(const nav_msgs::Odometry &msg){
+    g_tansVel = msg.twist.twist.linear.x * 1000.0;
+    g_rotVel = msg.twist.twist.angular.z /M_PI*180;
 }
 
 int main(int argc, char **argv) {
@@ -186,7 +186,7 @@ int main(int argc, char **argv) {
     geometry_msgs::Twist msg;
     cout << "publisher to cmd_vel done" << endl;
     ros::Subscriber vel;
-    vel = nh.subscribe("RosAria/com_vel",1000,&velMessageReceived);
+    vel = nh.subscribe("RosAria/pose",1000,&velMessageReceived);
     ros::Subscriber pose;
     pose = nh.subscribe("robot_pose_ekf/odom_combined", 1000, &poseMessageReceived);
     cout << "subscriber to odom_combined done" << endl;
@@ -203,11 +203,11 @@ int main(int argc, char **argv) {
     pub.publish(msg);
     cout << "configure state display done" << endl;
     int mid;
-    while (ros::ok()) {
+    while (waitKey(20)!=27) {
         ros::spinOnce();
         displayer.UpdateSurrounding(g_scan);
         mid = displayer.SearchFreeSpace(g_scan,2000,13);
-        cout<<mid<<endl;
+//        cout<<mid<<endl;
         displayer.DisplayImage();
         msg.linear.x = 0.4;
         for(int i=45;i<135;i++){
