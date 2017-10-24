@@ -32,10 +32,10 @@ private:
     Mat MyImage;
     Mat MyBackground;
     Size MySize;
-    string MyWindowName = "ChaoZ";
+    string MyWindowName;
     int MyScaleX;
     int MyScaleY;
-    double MyLaserOffset = 125;
+    double MyLaserOffset;
     Point MyRobotPosition;
     Point MyLaserPosition;
     double MyLaserMaxRange;
@@ -44,14 +44,13 @@ private:
     Vec3b colorRed;
     Vec3b colorBlue;
     Vec3b colorGreen;
-    int MyFrontLength = 313;
-    int MyHalfWidth = 253;
+    int MyFrontLength;
+    int MyHalfWidth;
 public:
     explicit StateDisplay();
     void DisplayImage();
     void DisplayBackground();
     void UpdateSurrounding(double* scan);
-    void UpdateEstimatePath();
     int SearchFreeSpace(double* scan, double distThres, int countThres);
 };
 

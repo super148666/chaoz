@@ -2,8 +2,7 @@
 // Created by chaoz on 22/10/17.
 //
 
-#include "state_display.h"
-//screen.cpp
+#include "tourGuide.h"
 
 geometry_msgs::PoseWithCovarianceStamped::_pose_type::_pose_type g_currentPose;
 double g_scan[181];
@@ -26,12 +25,13 @@ StateDisplay::StateDisplay() {
     colorGreen.val[COLOR_BLUE] = 0;
     colorGreen.val[COLOR_GREEN] = 255;
     colorGreen.val[COLOR_RED] = 0;
-
+    MyWindowName = "ChaoZ";
+    MyLaserOffset = 125;
     MyLaserMaxRange = 5000;
     int scaleFactor = 15;
     MyScaleX = MyScaleY = scaleFactor;
-    MyFrontLength /= scaleFactor;
-    MyHalfWidth /= scaleFactor;
+    MyFrontLength = 313 / scaleFactor;
+    MyHalfWidth = 253 / scaleFactor;
     MyRobotPosition = Point((int) (MyLaserMaxRange / MyScaleX),
                             (int) ceil((MyLaserMaxRange + MyLaserOffset) / MyScaleY));
     MyLaserPosition = MyRobotPosition;
@@ -207,7 +207,6 @@ int main(int argc, char **argv) {
         ros::spinOnce();
         displayer.UpdateSurrounding(g_scan);
         mid = displayer.SearchFreeSpace(g_scan,2000,13);
-//        cout<<mid<<endl;
         displayer.DisplayImage();
         msg.linear.x = 0.4;
         for(int i=45;i<135;i++){
@@ -224,8 +223,6 @@ int main(int argc, char **argv) {
         mid = (mid-90);
         msg.angular.z = mid;
         pub.publish(msg);
-
-
     }
 
     return (0);

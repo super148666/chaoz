@@ -3,8 +3,15 @@ cmake_minimum_required(VERSION 2.8.3)
 project(rosaria)
 # Load catkin and all dependencies required for this package
 # TODO: remove all from COMPONENTS that are not catkin packages.
-find_package(catkin REQUIRED COMPONENTS message_generation roscpp nav_msgs geometry_msgs sensor_msgs tf
-  dynamic_reconfigure)
+find_package(catkin REQUIRED COMPONENTS
+        rospy
+        message_generation
+        roscpp
+        nav_msgs
+        geometry_msgs
+        sensor_msgs
+        tf
+        dynamic_reconfigure)
 
 # Set the build type.  Options are:
 #  Coverage       : w/ debug symbols, w/o optimization, w/ code-coverage
@@ -21,8 +28,8 @@ find_package(catkin REQUIRED COMPONENTS message_generation roscpp nav_msgs geome
 
 #uncomment if you have defined messages
 add_message_files(
-  FILES
-  BumperState.msg
+        FILES
+        BumperState.msg
 )
 #uncomment if you have defined services
 #add_service_files(
@@ -38,45 +45,48 @@ generate_dynamic_reconfigure_options(cfg/RosAria.cfg)
 
 find_package(OpenCV REQUIRED)
 find_package(Boost REQUIRED COMPONENTS thread)
-include_directories(${catkin_INCLUDE_DIRS} ${Boost_INCLUDE_DIRS} )
+include_directories(${catkin_INCLUDE_DIRS} ${Boost_INCLUDE_DIRS})
 include_directories(${OpenCV_INCLUDE_DIRS})
 find_package(Aria QUIET)
-if(Aria_FOUND)
-	if(EXISTS "${Aria_INCLUDE_DIRS}/Aria.h")
-		add_definitions(-DADEPT_PKG)
-	endif()
-  include_directories(${Aria_INCLUDE_DIRS})
-  link_directories(${Aria_LIBRARY_DIRS})
-else()
-	# The installation package provided by Adept doesn't follow Debian policies
-	if(EXISTS "/usr/local/Aria/include/Aria.h")
-	  add_definitions(-DADEPT_PKG)
-	  include_directories( /usr/local/Aria/include)
-	  link_directories(/usr/local/Aria/lib)
-	endif()
-endif()
+if (Aria_FOUND)
+    if (EXISTS "${Aria_INCLUDE_DIRS}/Aria.h")
+        add_definitions(-DADEPT_PKG)
+    endif ()
+    include_directories(${Aria_INCLUDE_DIRS})
+    link_directories(${Aria_LIBRARY_DIRS})
+else ()
+    # The installation package provided by Adept doesn't follow Debian policies
+    if (EXISTS "/usr/local/Aria/include/Aria.h")
+        add_definitions(-DADEPT_PKG)
+        include_directories(/usr/local/Aria/include)
+        link_directories(/usr/local/Aria/lib)
+    endif ()
+endif ()
 
 add_executable(RosAria RosAria.cpp LaserPublisher.cpp)
-add_executable(StateDisplay state_display.cpp state_display.h)
+add_executable(tourGuide tourGuide.cpp tourGuide.h)
+add_executable(obstacleAvoid ObstacleAvoid.cpp)
 add_dependencies(RosAria rosaria_gencfg)
 add_dependencies(RosAria rosaria_gencpp)
 
 target_link_libraries(RosAria ${catkin_LIBRARIES} ${Boost_LIBRARIES} Aria pthread dl rt)
-target_link_libraries(StateDisplay ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} Aria pthread dl rt)
+target_link_libraries(tourGuide ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
+target_link_libraries(obstacleAvoid ${catkin_LIBARIES})
 set_target_properties(RosAria PROPERTIES COMPILE_FLAGS "-fPIC")
-set_target_properties(StateDisplay PROPERTIES COMPILE_FLAGS "-fPIC")
+set_target_properties(tourGuide PROPERTIES COMPILE_FLAGS "-fPIC")
+set_target_properties(obstacleAvoid PROPERTIES COMPILE_FLAGS "-fPIC")
 #set_target_properties(RosAria PROPERTIES LINK_FLAGS "-Wl")
 
 ## Generate added messages and services with any dependencies listed here
 generate_messages(
-  DEPENDENCIES geometry_msgs std_msgs
+        DEPENDENCIES geometry_msgs std_msgs
 )
 # TODO: fill in what other packages will need to use this package
 ## LIBRARIES: libraries you create in this project that dependent projects also need
 ## CATKIN_DEPENDS: catkin_packages dependent projects also need
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
-    DEPENDS roscpp nav_msgs geometry_msgs sensor_msgs tf
+        DEPENDS roscpp nav_msgs geometry_msgs sensor_msgs tf
 )
 
 #############
@@ -85,17 +95,11 @@ catkin_package(
 
 ## Mark executables and/or libraries for installation
 install(
-		TARGETS
-		RosAria
-		ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-		LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-		RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+        TARGETS
+        RosAria
+        tourGuide
+        obstacleAvoid
+        ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+        LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+        RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
-install(
-		TARGETS
-		StateDisplay
-		ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-		LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-		RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
-)
-

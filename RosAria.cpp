@@ -60,6 +60,8 @@ public:
 public:
     int Setup();
 
+    void poseMessageReceived(const nav_msgs::OdometryConstPtr&);
+
     void cmdvel_cb(const geometry_msgs::TwistConstPtr &);
 
     void cmdvel_watchdog(const ros::TimerEvent &event);
@@ -95,6 +97,7 @@ protected:
     bool published_motors_state;
 
     ros::Subscriber cmdvel_sub;
+    ros::Subscriber cmdpos_sub;
 
     ros::ServiceServer enable_srv;
     ros::ServiceServer disable_srv;
@@ -334,6 +337,7 @@ RosAriaNode::RosAriaNode(ros::NodeHandle nh) :
     enable_srv = n.advertiseService("enable_motors", &RosAriaNode::enable_motors_cb, this);
     disable_srv = n.advertiseService("disable_motors", &RosAriaNode::disable_motors_cb, this);
 
+
     veltime = ros::Time::now();
 }
 
@@ -503,6 +507,8 @@ int RosAriaNode::Setup() {
     cmdvel_sub = n.subscribe("cmd_vel", 1, (boost::function<void(const geometry_msgs::TwistConstPtr &)>)
             boost::bind(&RosAriaNode::cmdvel_cb, this, _1));
 
+    cmdpos_sub = n.subscribe("RosAria/newpose",1,(boost::function<void(const nav_msgs::OdometryConstPtr &)>)
+            boost::bind(&RosAriaNode::poseMessageReceived, this, _1));
     // register a watchdog for cmd_vel timeout
     double cmdvel_timeout_param = 0.6;
     n.param("cmd_vel_timeout", cmdvel_timeout_param, 0.6);
@@ -725,6 +731,12 @@ void RosAriaNode::cmdvel_watchdog(const ros::TimerEvent &event) {
         robot->setRotVel(0.0);
         robot->unlock();
     }
+}
+
+void RosAriaNode::poseMessageReceived(const nav_msgs::OdometryConstPtr &msg) {
+    robot->moveTo(ArPose(msg->pose.pose.position.x,msg->pose.pose.position.y,msg->pose.pose.orientation.w));
+    std::cout<<"position updated"<<std::endl;
+    std::cout<<"new position: ("<<robot->getX()<<","<<robot->getY()<<") ori:"<<robot->getTh()<<std::endl;
 }
 
 
