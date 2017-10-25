@@ -17,8 +17,8 @@
 #include <iostream>
 #include <string>
 
-#define RAD_TO_DEGREE 0.01745329252
-#define DEGREE_TO_RAD 57.29577951
+#define RAD_TO_DEGREE 57.29577951
+#define DEGREE_TO_RAD 0.01745329252
 #define COLOR_RED 2
 #define COLOR_GREEN 1
 #define COLOR_BLUE 0
@@ -51,7 +51,9 @@ public:
     void DisplayImage();
     void DisplayBackground();
     void UpdateSurrounding(double* scan);
-    int SearchFreeSpace(double* scan, double distThres, int countThres);
+    int SearchFreeSpace(double* scan, double distThres, int countThres, double angle);
+    void AddWayPoint(double dist, double ang);
+    void Clear();
 };
 
 #endif //ROSARIA_STATE_DISPLAY_H

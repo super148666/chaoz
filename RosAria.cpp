@@ -254,7 +254,7 @@ void RosAriaNode::dynamic_reconfigureCB(rosaria::RosAriaConfig &config, uint32_t
     robot->unlock();
 }
 
-/// Called when another node subscribes or unsubscribes from sonar topic.
+// Called when another node subscribes or unsubscribes from sonar topic.
 void RosAriaNode::sonarConnectCb() {
     publish_sonar = (sonar_pub.getNumSubscribers() > 0);
     publish_sonar_pointcloud2 = (sonar_pointcloud2_pub.getNumSubscribers() > 0);
@@ -336,7 +336,6 @@ RosAriaNode::RosAriaNode(ros::NodeHandle nh) :
     // advertise enable/disable services
     enable_srv = n.advertiseService("enable_motors", &RosAriaNode::enable_motors_cb, this);
     disable_srv = n.advertiseService("disable_motors", &RosAriaNode::disable_motors_cb, this);
-
 
     veltime = ros::Time::now();
 }
@@ -516,6 +515,8 @@ int RosAriaNode::Setup() {
     if (cmdvel_timeout_param > 0.0)
         cmdvel_watchdog_timer = n.createTimer(ros::Duration(0.1), &RosAriaNode::cmdvel_watchdog, this);
 
+    robot->moveTo(ArPose(0,0,0));
+    std::cout<<"init position x:"<<robot->getX()<<" y:"<<robot->getY()<<" th:"<<robot->getTh()<<std::endl;
     ROS_INFO_NAMED("rosaria", "rosaria: Setup complete");
     return 0;
 }

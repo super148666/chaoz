@@ -4,7 +4,6 @@ project(rosaria)
 # Load catkin and all dependencies required for this package
 # TODO: remove all from COMPONENTS that are not catkin packages.
 find_package(catkin REQUIRED COMPONENTS
-        rospy
         message_generation
         roscpp
         nav_msgs
@@ -65,16 +64,18 @@ endif ()
 
 add_executable(RosAria RosAria.cpp LaserPublisher.cpp)
 add_executable(tourGuide tourGuide.cpp tourGuide.h)
-add_executable(obstacleAvoid ObstacleAvoid.cpp)
+add_executable(teleop teleop.cpp)
+#add_executable(obstacleAvoid ObstacleAvoid.cpp)
 add_dependencies(RosAria rosaria_gencfg)
 add_dependencies(RosAria rosaria_gencpp)
 
 target_link_libraries(RosAria ${catkin_LIBRARIES} ${Boost_LIBRARIES} Aria pthread dl rt)
 target_link_libraries(tourGuide ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
-target_link_libraries(obstacleAvoid ${catkin_LIBARIES})
+target_link_libraries(teleop ${catkin_LIBRARIES} ${Boost_LIBRARIES} Aria pthread dl rt)
+#target_link_libraries(obstacleAvoid ${catkin_LIBARIES})
 set_target_properties(RosAria PROPERTIES COMPILE_FLAGS "-fPIC")
 set_target_properties(tourGuide PROPERTIES COMPILE_FLAGS "-fPIC")
-set_target_properties(obstacleAvoid PROPERTIES COMPILE_FLAGS "-fPIC")
+#set_target_properties(obstacleAvoid PROPERTIES COMPILE_FLAGS "-fPIC")
 #set_target_properties(RosAria PROPERTIES LINK_FLAGS "-Wl")
 
 ## Generate added messages and services with any dependencies listed here
@@ -98,7 +99,7 @@ install(
         TARGETS
         RosAria
         tourGuide
-        obstacleAvoid
+        teleop
         ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
         LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
         RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
