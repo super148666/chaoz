@@ -4,7 +4,7 @@
 
 #include "tourGuide.h"
 
-#define NUM_WAYPOINT 26
+#define NUM_WAYPOINT 25
 #define DIST_THRES 1000
 
 geometry_msgs::PoseWithCovarianceStamped::_pose_type::_pose_type g_currentPose;
@@ -153,59 +153,117 @@ ros::Publisher pub;
 //}
 
 //with imu & ekf with same linear speed
+//void InitGlobalVariables() {
+//    g_waypoint[0].x = 0;
+//    g_waypoint[0].y = 0;
+//    g_waypoint[1].x = 2.47858;
+//    g_waypoint[1].y = -0.0439127;
+//    g_waypoint[2].x = 5.00913;
+//    g_waypoint[2].y = -0.0173283;
+//    g_waypoint[3].x = 10.0168;
+//    g_waypoint[3].y = 0.186271;
+//    g_waypoint[4].x = 15.9999;
+//    g_waypoint[4].y = 0.295657;
+//    g_waypoint[5].x = 18.2217;
+//    g_waypoint[5].y = 0.364441;
+//    g_waypoint[6].x = 21.1733;
+//    g_waypoint[6].y = 0.230687;
+//    g_waypoint[7].x = 24.619;
+//    g_waypoint[7].y = 0.251135;
+//    g_waypoint[8].x = 24.9716;
+//    g_waypoint[8].y = -1.7321;
+//    g_waypoint[9].x = 24.682;
+//    g_waypoint[9].y = -4.52452;
+//    g_waypoint[10].x = 24.5231;
+//    g_waypoint[10].y = -7.44006;
+//    g_waypoint[11].x = 24.4622;
+//    g_waypoint[11].y = -8.45122;
+//    g_waypoint[12].x = 28.3627;
+//    g_waypoint[12].y = -9.14844;
+//    g_waypoint[13].x = 30.6409;
+//    g_waypoint[13].y = -9.33571;
+//    g_waypoint[14].x = 35.1873;
+//    g_waypoint[14].y = -9.80884;
+//    g_waypoint[15].x = 37.2536;
+//    g_waypoint[15].y = -9.97621;
+//    g_waypoint[16].x = 40.5358;
+//    g_waypoint[16].y = -10.128;
+//    g_waypoint[17].x = 26.1429;
+//    g_waypoint[17].y = -3.52259;
+//    g_waypoint[18].x = 29.6772;
+//    g_waypoint[18].y = 4.37549;
+//    g_waypoint[19].x = 34.9495;
+//    g_waypoint[19].y = 14.2847;
+//    g_waypoint[20].x = 36.8092;
+//    g_waypoint[20].y = 17.9354;
+//    g_waypoint[21].x = 44.9735;
+//    g_waypoint[21].y = 31.8071;
+//    g_waypoint[22].x = 49.0771;
+//    g_waypoint[22].y = 38.9189;
+//    g_waypoint[23].x = 51.7197;
+//    g_waypoint[23].y = 43.0586;
+//    g_waypoint[24].x = 53.8069;
+//    g_waypoint[24].y = 46.0337;
+//    g_waypoint[25].x = 44.1865;
+//    g_waypoint[25].y = 32.7784;
+//    for (int i = 0; i < NUM_WAYPOINT; i++) {
+//        g_waypoint[i].z = 0;
+//        g_waypoint[i].x *= 1000.0;
+//        g_waypoint[i].y *= 1000.0;
+//    }
+//}
+
 void InitGlobalVariables() {
     g_waypoint[0].x = 0;
     g_waypoint[0].y = 0;
-    g_waypoint[1].x = 2.47858;
-    g_waypoint[1].y = -0.0439127;
-    g_waypoint[2].x = 5.00913;
-    g_waypoint[2].y = -0.0173283;
-    g_waypoint[3].x = 10.0168;
-    g_waypoint[3].y = 0.186271;
-    g_waypoint[4].x = 15.9999;
-    g_waypoint[4].y = 0.295657;
-    g_waypoint[5].x = 18.2217;
-    g_waypoint[5].y = 0.364441;
-    g_waypoint[6].x = 21.1733;
-    g_waypoint[6].y = 0.230687;
-    g_waypoint[7].x = 24.619;
-    g_waypoint[7].y = 0.251135;
-    g_waypoint[8].x = 24.9716;
-    g_waypoint[8].y = -1.7321;
-    g_waypoint[9].x = 24.682;
-    g_waypoint[9].y = -4.52452;
-    g_waypoint[10].x = 24.5231;
-    g_waypoint[10].y = -7.44006;
-    g_waypoint[11].x = 24.4622;
-    g_waypoint[11].y = -8.45122;
-    g_waypoint[12].x = 28.3627;
-    g_waypoint[12].y = -9.14844;
-    g_waypoint[13].x = 30.6409;
-    g_waypoint[13].y = -9.33571;
-    g_waypoint[14].x = 35.1873;
-    g_waypoint[14].y = -9.80884;
-    g_waypoint[15].x = 37.2536;
-    g_waypoint[15].y = -9.97621;
-    g_waypoint[16].x = 40.5358;
-    g_waypoint[16].y = -10.128;
-    g_waypoint[17].x = 26.1429;
-    g_waypoint[17].y = -3.52259;
-    g_waypoint[18].x = 29.6772;
-    g_waypoint[18].y = 4.37549;
-    g_waypoint[19].x = 34.9495;
-    g_waypoint[19].y = 14.2847;
-    g_waypoint[20].x = 36.8092;
-    g_waypoint[20].y = 17.9354;
-    g_waypoint[21].x = 44.9735;
-    g_waypoint[21].y = 31.8071;
-    g_waypoint[22].x = 49.0771;
-    g_waypoint[22].y = 38.9189;
-    g_waypoint[23].x = 51.7197;
-    g_waypoint[23].y = 43.0586;
-    g_waypoint[24].x = 53.8069;
-    g_waypoint[24].y = 46.0337;
-    g_waypoint[25].x = 44.1865;
-    g_waypoint[25].y = 32.7784;
+    g_waypoint[1].x = 1.797;
+    g_waypoint[1].y = 0;
+    g_waypoint[2].x = 4.499;
+    g_waypoint[2].y = 0.127;
+    g_waypoint[3].x = 9.762;
+    g_waypoint[3].y = 0.268;
+    g_waypoint[4].x = 15.451;
+    g_waypoint[4].y = 0.305;
+    g_waypoint[5].x = 17.389;
+    g_waypoint[5].y = 0.309;
+    g_waypoint[6].x = 20.627;
+    g_waypoint[6].y = 0.315;
+    g_waypoint[7].x = 23.465;
+    g_waypoint[7].y = 0.32;
+    g_waypoint[8].x = 23.467;
+    g_waypoint[8].y = -1.884;
+    g_waypoint[9].x = 23.469;
+    g_waypoint[9].y = -4.16;
+    g_waypoint[10].x = 23.471;
+    g_waypoint[10].y = -7.004;
+    g_waypoint[11].x = 27.881;
+    g_waypoint[11].y = -8.101;
+    g_waypoint[12].x = 30.189;
+    g_waypoint[12].y = -8.01;
+    g_waypoint[13].x = 34.408;
+    g_waypoint[13].y = -8.002;
+    g_waypoint[14].x = 36.873;
+    g_waypoint[14].y = -7.997;
+    g_waypoint[15].x = 39.756;
+    g_waypoint[15].y = -7.992;
+    g_waypoint[16].x = 23.686;
+    g_waypoint[16].y = -7.717;
+    g_waypoint[17].x = 23.989;
+    g_waypoint[17].y = 10.496;
+    g_waypoint[18].x = 23.756;
+    g_waypoint[18].y = 15.693;
+    g_waypoint[19].x = 23.55;
+    g_waypoint[19].y = 22.716;
+    g_waypoint[20].x = 23.72;
+    g_waypoint[20].y = 30.899;
+    g_waypoint[21].x = 23.406;
+    g_waypoint[21].y = 38.486;
+    g_waypoint[22].x = 23.365;
+    g_waypoint[22].y = 42.497;
+    g_waypoint[23].x = 23.329;
+    g_waypoint[23].y = 46.106;
+    g_waypoint[24].x = 23.591;
+    g_waypoint[24].y = 29.231;
     for (int i = 0; i < NUM_WAYPOINT; i++) {
         g_waypoint[i].z = 0;
         g_waypoint[i].x *= 1000.0;
@@ -388,6 +446,9 @@ void StateDisplay::AddWayPoint(double dist, double ang) {
     }
     waypoint.x = ((int) (dist * -sin(rad) / MyScaleX) + MyRobotPosition.x);
     waypoint.y = ((int) (dist * cos(rad) / MyScaleY) + MyRobotPosition.y);
+    if(waypoint.y>MyRobotPosition.y){
+        waypoint.y = MyRobotPosition.y;
+    }
     circle(MyImage,waypoint,10,Scalar(0,0,255),-1);
 }
 
