@@ -128,8 +128,8 @@ void TeleopRosAria::keyLoop()
                 break;
             case KEYCODE_P:
                 ros::spinOnce();
-                std::cout<<"g_wayPoint["<<count<<"].x = "<<g_currentPose.position.x<<";"<<std::endl;
-                std::cout<<"g_wayPoint["<<count<<"].y = "<<g_currentPose.position.y<<";"<<std::endl;
+                std::cout<<"g_waypoint["<<count<<"].x = "<<g_currentPose.position.x<<";"<<std::endl;
+                std::cout<<"g_waypoint["<<count<<"].y = "<<g_currentPose.position.y<<";"<<std::endl;
                 count++;
                 break;
         }
