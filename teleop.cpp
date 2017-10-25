@@ -18,15 +18,15 @@
 #define KEYCODE_SPACE 32
 #define KEYCODE_RACE 114
 
-//geometry_msgs::PoseWithCovarianceStamped::_pose_type::_pose_type g_currentPose;
-//void positionMessageReceived(const geometry_msgs::PoseWithCovarianceStamped &msg){
-//    g_currentPose = msg.pose.pose;
-//}
-
-nav_msgs::Odometry::_pose_type::_pose_type g_currentPose;
-void positionMessageReceived(const nav_msgs::Odometry &msg){
+geometry_msgs::PoseWithCovarianceStamped::_pose_type::_pose_type g_currentPose;
+void positionMessageReceived(const geometry_msgs::PoseWithCovarianceStamped &msg){
     g_currentPose = msg.pose.pose;
 }
+
+//nav_msgs::Odometry::_pose_type::_pose_type g_currentPose;
+//void positionMessageReceived(const nav_msgs::Odometry &msg){
+//    g_currentPose = msg.pose.pose;
+//}
 
 class TeleopRosAria
 {
@@ -48,8 +48,8 @@ TeleopRosAria::TeleopRosAria():
     nh_.param("scale_angular", a_scale_, a_scale_);
     nh_.param("scale_linear", l_scale_, l_scale_);
     twist_pub_ = nh_.advertise<geometry_msgs::Twist>("RosAria/cmd_vel", 1);
-//    pose_sub_ = nh_.subscribe("robot_pose_ekf/odom_combined",1,&positionMessageReceived);
-    pose_sub_ = nh_.subscribe("RosAria/pose",1,&positionMessageReceived);
+    pose_sub_ = nh_.subscribe("robot_pose_ekf/odom_combined",1,&positionMessageReceived);
+//    pose_sub_ = nh_.subscribe("RosAria/pose",1,&positionMessageReceived);
 }
 int kfd = 0;
 struct termios cooked, raw;
