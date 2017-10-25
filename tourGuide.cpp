@@ -4,8 +4,8 @@
 
 #include "tourGuide.h"
 
-#define NUM_WAYPOINT 27
-#define DIST_THRES 500
+#define NUM_WAYPOINT 26
+#define DIST_THRES 1000
 
 geometry_msgs::PoseWithCovarianceStamped::_pose_type::_pose_type g_currentPose;
 //nav_msgs::Odometry::_pose_type::_pose_type g_currentPose;
@@ -92,64 +92,125 @@ ros::Publisher pub;
 //}
 
 //with imu & ekf
+//void InitGlobalVariables() {
+//    for(int i=0;i<NUM_WAYPOINT;i++){
+//        g_waypoint[i].z = 0;
+//    }
+//    g_waypoint[0].x = 0;
+//    g_waypoint[0].y = 0;
+//    g_waypoint[1].x = 2.34865*1000;
+//    g_waypoint[1].y = -0.134793*1000;
+//    g_waypoint[2].x = 5.90467*1000;
+//    g_waypoint[2].y = -0.33409*1000;
+//    g_waypoint[3].x = 11.098*1000;
+//    g_waypoint[3].y = -0.507425*1000;
+//    g_waypoint[4].x = 16.8485*1000;
+//    g_waypoint[4].y = -1.03163*1000;
+//    g_waypoint[5].x = 19.0892*1000;
+//    g_waypoint[5].y = -1.21065*1000;
+//    g_waypoint[6].x = 22.4892*1000;
+//    g_waypoint[6].y = -1.47782*1000;
+//    g_waypoint[7].x = 26.1104*1000;
+//    g_waypoint[7].y = -1.94202*1000;
+//    g_waypoint[8].x = 25.7968*1000;
+//    g_waypoint[8].y = -4.14788*1000;
+//    g_waypoint[9].x = 25.4624*1000;
+//    g_waypoint[9].y = -6.47065*1000;
+//    g_waypoint[10].x = 24.9693*1000;
+//    g_waypoint[10].y = -9.18086*1000;
+//    g_waypoint[11].x = 24.766*1000;
+//    g_waypoint[11].y = -10.4076*1000;
+//    g_waypoint[12].x = 28.8565*1000;
+//    g_waypoint[12].y = -11.2251*1000;
+//    g_waypoint[13].x = 31.1937*1000;
+//    g_waypoint[13].y = -11.68*1000;
+//    g_waypoint[14].x = 35.6165*1000;
+//    g_waypoint[14].y = -12.4605*1000;
+//    g_waypoint[15].x = 37.6738*1000;
+//    g_waypoint[15].y = -12.7547*1000;
+//    g_waypoint[16].x = 25.295*1000;
+//    g_waypoint[16].y = -9.45628*1000;
+//    g_waypoint[17].x = 27.6272*1000;
+//    g_waypoint[17].y = -1.00099*1000;
+//    g_waypoint[18].x = 31.8136*1000;
+//    g_waypoint[18].y = 8.75242*1000;
+//    g_waypoint[19].x = 33.5139*1000;
+//    g_waypoint[19].y = 13.1856*1000;
+//    g_waypoint[20].x = 36.2642*1000;
+//    g_waypoint[20].y = 20.2039*1000;
+//    g_waypoint[21].x = 39.8409*1000;
+//    g_waypoint[21].y = 28.2846*1000;
+//    g_waypoint[22].x = 43.8101*1000;
+//    g_waypoint[22].y = 35.1068*1000;
+//    g_waypoint[23].x = 46.4566*1000;
+//    g_waypoint[23].y = 39.3946*1000;
+//    g_waypoint[24].x = 47.2396*1000;
+//    g_waypoint[24].y = 40.3156*1000;
+//    g_waypoint[25].x = 48.5556*1000;
+//    g_waypoint[25].y = 42.0615*1000;
+//    g_waypoint[26].x = 39.4277*1000;
+//    g_waypoint[26].y = 28.5384*1000;
+//}
+
+//with imu & ekf with same linear speed
 void InitGlobalVariables() {
-    for(int i=0;i<NUM_WAYPOINT;i++){
-        g_waypoint[i].z = 0;
-    }
     g_waypoint[0].x = 0;
     g_waypoint[0].y = 0;
-    g_waypoint[1].x = 2.34865*1000;
-    g_waypoint[1].y = -0.134793*1000;
-    g_waypoint[2].x = 5.90467*1000;
-    g_waypoint[2].y = -0.33409*1000;
-    g_waypoint[3].x = 11.098*1000;
-    g_waypoint[3].y = -0.507425*1000;
-    g_waypoint[4].x = 16.8485*1000;
-    g_waypoint[4].y = -1.03163*1000;
-    g_waypoint[5].x = 19.0892*1000;
-    g_waypoint[5].y = -1.21065*1000;
-    g_waypoint[6].x = 22.4892*1000;
-    g_waypoint[6].y = -1.47782*1000;
-    g_waypoint[7].x = 26.1104*1000;
-    g_waypoint[7].y = -1.94202*1000;
-    g_waypoint[8].x = 25.7968*1000;
-    g_waypoint[8].y = -4.14788*1000;
-    g_waypoint[9].x = 25.4624*1000;
-    g_waypoint[9].y = -6.47065*1000;
-    g_waypoint[10].x = 24.9693*1000;
-    g_waypoint[10].y = -9.18086*1000;
-    g_waypoint[11].x = 24.766*1000;
-    g_waypoint[11].y = -10.4076*1000;
-    g_waypoint[12].x = 28.8565*1000;
-    g_waypoint[12].y = -11.2251*1000;
-    g_waypoint[13].x = 31.1937*1000;
-    g_waypoint[13].y = -11.68*1000;
-    g_waypoint[14].x = 35.6165*1000;
-    g_waypoint[14].y = -12.4605*1000;
-    g_waypoint[15].x = 37.6738*1000;
-    g_waypoint[15].y = -12.7547*1000;
-    g_waypoint[16].x = 25.295*1000;
-    g_waypoint[16].y = -9.45628*1000;
-    g_waypoint[17].x = 27.6272*1000;
-    g_waypoint[17].y = -1.00099*1000;
-    g_waypoint[18].x = 31.8136*1000;
-    g_waypoint[18].y = 8.75242*1000;
-    g_waypoint[19].x = 33.5139*1000;
-    g_waypoint[19].y = 13.1856*1000;
-    g_waypoint[20].x = 36.2642*1000;
-    g_waypoint[20].y = 20.2039*1000;
-    g_waypoint[21].x = 39.8409*1000;
-    g_waypoint[21].y = 28.2846*1000;
-    g_waypoint[22].x = 43.8101*1000;
-    g_waypoint[22].y = 35.1068*1000;
-    g_waypoint[23].x = 46.4566*1000;
-    g_waypoint[23].y = 39.3946*1000;
-    g_waypoint[24].x = 47.2396*1000;
-    g_waypoint[24].y = 40.3156*1000;
-    g_waypoint[25].x = 48.5556*1000;
-    g_waypoint[25].y = 42.0615*1000;
-    g_waypoint[26].x = 39.4277*1000;
-    g_waypoint[26].y = 28.5384*1000;
+    g_waypoint[1].x = 2.47858;
+    g_waypoint[1].y = -0.0439127;
+    g_waypoint[2].x = 5.00913;
+    g_waypoint[2].y = -0.0173283;
+    g_waypoint[3].x = 10.0168;
+    g_waypoint[3].y = 0.186271;
+    g_waypoint[4].x = 15.9999;
+    g_waypoint[4].y = 0.295657;
+    g_waypoint[5].x = 18.2217;
+    g_waypoint[5].y = 0.364441;
+    g_waypoint[6].x = 21.1733;
+    g_waypoint[6].y = 0.230687;
+    g_waypoint[7].x = 24.619;
+    g_waypoint[7].y = 0.251135;
+    g_waypoint[8].x = 24.9716;
+    g_waypoint[8].y = -1.7321;
+    g_waypoint[9].x = 24.682;
+    g_waypoint[9].y = -4.52452;
+    g_waypoint[10].x = 24.5231;
+    g_waypoint[10].y = -7.44006;
+    g_waypoint[11].x = 24.4622;
+    g_waypoint[11].y = -8.45122;
+    g_waypoint[12].x = 28.3627;
+    g_waypoint[12].y = -9.14844;
+    g_waypoint[13].x = 30.6409;
+    g_waypoint[13].y = -9.33571;
+    g_waypoint[14].x = 35.1873;
+    g_waypoint[14].y = -9.80884;
+    g_waypoint[15].x = 37.2536;
+    g_waypoint[15].y = -9.97621;
+    g_waypoint[16].x = 40.5358;
+    g_waypoint[16].y = -10.128;
+    g_waypoint[17].x = 26.1429;
+    g_waypoint[17].y = -3.52259;
+    g_waypoint[18].x = 29.6772;
+    g_waypoint[18].y = 4.37549;
+    g_waypoint[19].x = 34.9495;
+    g_waypoint[19].y = 14.2847;
+    g_waypoint[20].x = 36.8092;
+    g_waypoint[20].y = 17.9354;
+    g_waypoint[21].x = 44.9735;
+    g_waypoint[21].y = 31.8071;
+    g_waypoint[22].x = 49.0771;
+    g_waypoint[22].y = 38.9189;
+    g_waypoint[23].x = 51.7197;
+    g_waypoint[23].y = 43.0586;
+    g_waypoint[24].x = 53.8069;
+    g_waypoint[24].y = 46.0337;
+    g_waypoint[25].x = 44.1865;
+    g_waypoint[25].y = 32.7784;
+    for (int i = 0; i < NUM_WAYPOINT; i++) {
+        g_waypoint[i].z = 0;
+        g_waypoint[i].x *= 1000.0;
+        g_waypoint[i].y *= 1000.0;
+    }
 }
 
 double GetDistance(double x1, double y1, double x2, double y2) {
@@ -157,7 +218,7 @@ double GetDistance(double x1, double y1, double x2, double y2) {
 }
 
 double GetAngle(double x1, double y1, double x2, double y2, double ori2) {
-    double ang = atan2(y1 - y2, x1 - x2)*RAD_TO_DEGREE;
+    double ang = atan2(y1 - y2, x1 - x2) * RAD_TO_DEGREE;
 //    cout<<"atan2:"<<ang;
     ang -= ori2;
 //    cout<<" -"<<ori2<<":"<<ang;
@@ -295,7 +356,7 @@ int StateDisplay::SearchFreeSpace(double *scan, double distThres, int countThres
                 midPoint = Point(((int) (scan[i] * cos(rad) / MyScaleX) + MyLaserPosition.x),
                                  ((int) (scan[i] * sin(rad) / MyScaleY) + MyLaserPosition.y));
                 line(MyImage, MyLaserPosition, midPoint, Scalar(0, 255, 0));
-                if (abs(mid-angle) < abs(leftMid-angle)) {
+                if (abs(mid - angle) < abs(leftMid - angle)) {
                     leftMid = mid;
                 }
             }
@@ -327,11 +388,15 @@ void StateDisplay::AddWayPoint(double dist, double ang) {
     }
     waypoint.x = ((int) (dist * -sin(rad) / MyScaleX) + MyRobotPosition.x);
     waypoint.y = ((int) (dist * cos(rad) / MyScaleY) + MyRobotPosition.y);
-    line(MyImage, MyRobotPosition, waypoint, Scalar(255, 0, 255));
+    circle(MyImage,waypoint,10,Scalar(0,0,255),-1);
 }
 
 void StateDisplay::Clear() {
     MyImage = MyBackground.clone();
+}
+
+void StateDisplay::SaveImage(string name) {
+    imwrite(name,MyImage);
 }
 //void poseMessageReceived(const geometry_msgs::PoseWithCovarianceStamped &msg) {
 //    g_currentPose = msg.pose.pose;
@@ -344,7 +409,7 @@ geometry_msgs::Twist *DriveFreeSpace() {
     msg->angular.x = msg->angular.y = msg->angular.z = 0.0;
     ros::spinOnce();
     displayer.UpdateSurrounding(g_scan);
-    int mid = displayer.SearchFreeSpace(g_scan, 2000, 13,90.0);
+    int mid = displayer.SearchFreeSpace(g_scan, 2000, 13, 90.0);
     displayer.DisplayImage();
     msg->linear.x = 0.4;
     for (int i = 45; i < 135; i++) {
@@ -370,11 +435,11 @@ geometry_msgs::Twist *DriveWayPoint() {
     geometry_msgs::Twist *msg = new geometry_msgs::Twist;
     msg->linear.y = msg->linear.z = msg->linear.x = 0.0;
     msg->angular.x = msg->angular.y = msg->angular.z = 0.0;
-    if(reach){
+    if (reach) {
         sleep(3);
         // Play Sound or Image!!
         // tourGuide!!
-        cout<<"reach point "<<currentWayPoint<<endl;
+        cout << "reach point " << currentWayPoint << endl;
         reach = false;
         currentWayPoint++;
     }
@@ -386,6 +451,9 @@ geometry_msgs::Twist *DriveWayPoint() {
                               g_currentPose.position.x * 1000.0, g_currentPose.position.y * 1000.0);
     if (dist < DIST_THRES) {
         reach = true;
+        stringstream sstm;
+        sstm<<"waypoint"<<currentWayPoint<<".jpg";
+        displayer.SaveImage(sstm.str());
         return msg;
     }
     double angle = GetAngle(g_waypoint[currentWayPoint].x, g_waypoint[currentWayPoint].y,
@@ -394,30 +462,38 @@ geometry_msgs::Twist *DriveWayPoint() {
     displayer.Clear();
     displayer.UpdateSurrounding(g_scan);
     int mid = displayer.SearchFreeSpace(g_scan, 2000, 15, 0);
-    displayer.AddWayPoint(dist,angle);
+    displayer.AddWayPoint(dist, angle);
     displayer.DisplayImage();
-    msg->linear.x = 0.5;
+    msg->linear.x = 0.4;
     cout << "dist to waypoint " << currentWayPoint << " is " << dist << "mm with " << angle << "degree" << endl;
-    if(currentWayPoint<3){
-        msg->angular.z = angle;
+    if (currentWayPoint < 3) {
+        if (angle = 0) {
+            msg->angular.z = 0;
+        }
+        if (angle > 0) {
+            msg->angular.z = 30;
+        }
+        if (angle < 0) {
+            msg->angular.z = -30;
+        }
         if (abs(angle) > 10) {
             msg->linear.x = 0;
         }
         return msg;
     }
-    for (int i = 45; i < 135; i++) {
+    for (int i = 0; i < 181; i++) {
         if (g_scan[i] < 400) {
             msg->linear.x = 0;
             break;
         }
     }
-    if(abs(angle)>30 && dist>1000){
+    if (abs(angle) > 30 && g_scan[(int)angle+90]>dist) {
         msg->linear.x = 0;
-        msg->angular.z = angle;
+        msg->angular.z = angle > 0 ? 30 : -30;
         return msg;
     }
     if (mid == -1) {
-        msg->angular.z = -90;
+        msg->angular.z = -30;
         return msg;
     }
     mid = (mid - 90);
@@ -429,12 +505,12 @@ geometry_msgs::Twist *DriveWayPoint() {
 
 void poseMessageReceived(const geometry_msgs::PoseWithCovarianceStamped &msg) {
     g_currentPose = msg.pose.pose;
-    g_currentPose.orientation.w = atan2(g_currentPose.orientation.z,g_currentPose.orientation.w)*2/M_PI*180;
-    if(g_currentPose.orientation.w<-180){
+    g_currentPose.orientation.w = atan2(g_currentPose.orientation.z, g_currentPose.orientation.w) * 2 / M_PI * 180;
+    if (g_currentPose.orientation.w < -180) {
         g_currentPose.orientation.w += 360;
     }
-    if(g_currentPose.orientation.w>180){
-        g_currentPose.orientation.w -=360;
+    if (g_currentPose.orientation.w > 180) {
+        g_currentPose.orientation.w -= 360;
     }
     pub.publish(*DriveWayPoint());
 }
@@ -451,7 +527,6 @@ void velMessageReceived(const nav_msgs::Odometry &msg) {
     g_tansVel = msg.twist.twist.linear.x * 1000.0;
     g_rotVel = msg.twist.twist.angular.z / M_PI * 180;
 }
-
 
 
 int main(int argc, char **argv) {

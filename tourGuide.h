@@ -54,6 +54,7 @@ public:
     int SearchFreeSpace(double* scan, double distThres, int countThres, double angle);
     void AddWayPoint(double dist, double ang);
     void Clear();
+    void SaveImage(string name);
 };
 
 #endif //ROSARIA_STATE_DISPLAY_H

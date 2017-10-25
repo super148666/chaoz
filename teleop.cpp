@@ -12,9 +12,10 @@
 #define KEYCODE_L 97
 #define KEYCODE_U 119
 #define KEYCODE_D 115
-#define KEYCODE_Q 0x71
-#define KEYCODE_P 0x70
-#define KEYCODE_SPACE 0x20
+#define KEYCODE_Q 113
+#define KEYCODE_P 112
+#define KEYCODE_SPACE 32
+#define KEYCODE_RACE 114
 
 geometry_msgs::PoseWithCovarianceStamped::_pose_type::_pose_type g_currentPose;
 void positionMessageReceived(const geometry_msgs::PoseWithCovarianceStamped &msg){
@@ -61,8 +62,14 @@ int main(int argc, char** argv)
 }
 void TeleopRosAria::keyLoop()
 {
+    static bool raceMode = false;
     l_scale_ = 5000;
     a_scale_ = 500;
+    if(raceMode){
+        l_scale_ = 10000;
+        a_scale_ = 1000;
+    }
+
     static int count = 0;
     char c;
     bool dirty=false;
@@ -131,6 +138,15 @@ void TeleopRosAria::keyLoop()
                 std::cout<<"g_waypoint["<<count<<"].x = "<<g_currentPose.position.x<<";"<<std::endl;
                 std::cout<<"g_waypoint["<<count<<"].y = "<<g_currentPose.position.y<<";"<<std::endl;
                 count++;
+                break;
+            case KEYCODE_RACE:
+                if(!raceMode){
+                    raceMode = true;
+                    std::cout<<"Race Mode ON!!"<<std::endl;
+                }else{
+                    raceMode = false;
+                    std::cout<<"Race Mode OFF."<<std::endl;
+                }
                 break;
         }
         geometry_msgs::Twist twist;
