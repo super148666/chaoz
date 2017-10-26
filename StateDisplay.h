@@ -31,7 +31,6 @@ using namespace std;
 
 class StateDisplay{
 private:
-    Mat MyObject;
     Mat MyImage;
     Mat MyBackground;
     Size MySize;
@@ -49,14 +48,13 @@ private:
     Vec3b colorGreen;
     int MyFrontLength;
     int MyHalfWidth;
-    int minHessian;
-    double tt;
 public:
     explicit StateDisplay();
     void DisplayImage();
     void DisplayBackground();
     void UpdateSurrounding(double* scan);
     int SearchFreeSpace(double* scan, double distThres, int countThres, double angle);
+    void MotionEstimate(double linearVel, double angularVel);
     void AddWayPoint(double dist, double ang, Scalar color);
     void AddLaserPoint(double dist, double ang, Scalar color);
     void Clear();
