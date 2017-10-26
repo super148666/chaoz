@@ -27,7 +27,7 @@
 #define NN_NUM_HIDEN_NN 10
 #define NN_NUM_OUTPUT 1
 #define STEP_SIZE 1
-#define DELTA_SCAN 200.0
+#define DELTA_SCAN 1
 
 float g_weight1[NN_NUM_INPUT][NN_NUM_HIDEN_NN];
 float g_weight2[NN_NUM_HIDEN_NN][NN_NUM_OUTPUT];
@@ -483,11 +483,6 @@ double GetAngle(double x1, double y1, double x2, double y2, double ori2) {
 
 StateDisplay::StateDisplay() {
     MyObject = imread("~/door.jpg",CV_LOAD_IMAGE_GRAYSCALE);
-    if( !MyObject.data )
-    {
-        std::cout<< "Error reading object " << std::endl;
-        exit (-1);
-    }
     minHessian = 500;
     tt = (double)cvGetTickCount();
     colorBlack.val[COLOR_BLUE] = 0;
@@ -921,12 +916,12 @@ void Detect() {
     }
     inputData[NN_NUM_INPUT-1] = 1.0;
     feedforward(inputData);
-    if (inputData[0]>0.5) {
+    if (g_out[0]>0.5) {
         for (int i = 180; i > 135; i--) {
             displayer.AddLaserPoint(g_scan[i], i - 90, Scalar(0, 0, 255));
         }
     }
-    cout<<" left:"<<inputData[0];
+    cout<<" left:"<<g_out[0];
 
     //right
     maximumScan = 0.0;
@@ -950,12 +945,12 @@ void Detect() {
     }
     inputData[NN_NUM_INPUT-1] = 1.0;
     feedforward(inputData);
-    if (inputData[0]>0.5) {
+    if (g_out[0]>0.5) {
         for (int i = 0; i < 45; i++) {
             displayer.AddLaserPoint(g_scan[i], i - 90, Scalar(0, 0, 255));
         }
     }
-    cout<<"right:"<<inputData[0]<<endl;
+    cout<<"right:"<<g_out[0]<<endl;
     displayer.DisplayImage();
 }
 

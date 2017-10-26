@@ -63,7 +63,7 @@ else ()
 endif ()
 
 add_executable(RosAria RosAria.cpp LaserPublisher.cpp)
-add_executable(tourGuide tourGuide.cpp tourGuide.h doorDetect.cpp doorDetect.h)
+add_executable(tourGuide tourGuide.cpp tourGuide.h)
 add_executable(teleop teleop.cpp)
 #add_executable(obstacleAvoid ObstacleAvoid.cpp)
 add_dependencies(RosAria rosaria_gencfg)
