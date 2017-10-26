@@ -23,17 +23,7 @@
 #define KEYCODE_I 105   //i
 
 //NN SETTING
-#define NN_NUM_INPUT 3
-#define NN_NUM_HIDEN_NN 10
-#define NN_NUM_OUTPUT 1
-#define STEP_SIZE 1
-#define DELTA_SCAN 1
-
-float g_weight1[NN_NUM_INPUT][NN_NUM_HIDEN_NN];
-float g_weight2[NN_NUM_HIDEN_NN][NN_NUM_OUTPUT];
-float g_input[NN_NUM_INPUT];
-float g_outHidden[NN_NUM_HIDEN_NN];
-float g_out[NN_NUM_OUTPUT];
+#define DELTA_SCAN 200.0
 
 //geometry_msgs::PoseWithCovarianceStamped::_pose_type::_pose_type g_currentPose;
 nav_msgs::Odometry::_pose_type::_pose_type g_currentPose;
@@ -43,6 +33,11 @@ double g_scan[181];
 double g_tansVel = 0.0;
 double g_rotVel = 0.0;
 ros::Publisher pub;
+double g_linear = 0.0;
+double g_angular = 0.0;
+bool g_leftOpen = false;
+bool g_rightOpen = false;
+bool g_frontOpen = false;
 
 int kfd = 0;
 struct termios cooked, raw;
@@ -271,13 +266,9 @@ void laserMessageReceived(const sensor_msgs::LaserScan &msg);
 
 void velMessageReceived(const nav_msgs::Odometry &msg);
 
-void feedforward(float *input);
+int LeftDetect();
 
-float sigmoid(float x);
-
-float backprop(float train_in[], float train_sol[]);
-
-void init_weights();
+int RightDetect();
 
 void Train();
 
@@ -287,7 +278,6 @@ void Print();
 
 int main(int argc, char **argv) {
     InitGlobalVariables();
-    init_weights();
 
 
     ros::init(argc, argv, "state_display");
@@ -303,8 +293,8 @@ int main(int argc, char **argv) {
     pose = nh.subscribe("RosAria/pose", 1000, &poseMessageReceived);
     cout << "subscriber to pose done" << endl;
     ros::Subscriber laser;
-//    laser = nh.subscribe("RosAria/lms1xx_1_laserscan", 1000, &laserMessageReceived);
-    laser = nh.subscribe("RosAria/sim_lms1xx_1_laserscan", 1000, &laserMessageReceived);
+    laser = nh.subscribe("RosAria/lms1xx_1_laserscan", 1000, &laserMessageReceived);
+//    laser = nh.subscribe("RosAria/sim_lms1xx_1_laserscan", 1000, &laserMessageReceived);
     cout << "subscriber to laserscan done" << endl;
 
     msg.linear.x = 0;
@@ -316,11 +306,11 @@ int main(int argc, char **argv) {
     pub.publish(msg);
     cout << "configure state display done" << endl;
 
-    TeleopRosAria teleop_RosAria;
-    signal(SIGINT, quit);
-    teleop_RosAria.keyLoop();
+//    TeleopRosAria teleop_RosAria;
+//    signal(SIGINT, quit);
+//    teleop_RosAria.keyLoop();
 
-//    ros::spin();
+    ros::spin();
 
 
     return (0);
@@ -328,6 +318,8 @@ int main(int argc, char **argv) {
 
 void poseMessageReceived(const nav_msgs::Odometry &msg) {
     g_currentPose = msg.pose.pose;
+    g_linear = msg.twist.twist.linear.x;
+    g_angular = msg.twist.twist.angular.z;
     g_currentPose.orientation.w = atan2(g_currentPose.orientation.z, g_currentPose.orientation.w) * 2 / M_PI * 180;
     if (g_currentPose.orientation.w < -180) {
         g_currentPose.orientation.w += 360;
@@ -339,11 +331,43 @@ void poseMessageReceived(const nav_msgs::Odometry &msg) {
 }
 
 void laserMessageReceived(const sensor_msgs::LaserScan &msg) {
+    static
     int index = 0;
+    int count;
     for (int i = 90; i < 451; i = i + 2) {
         index = (i - 90) / 2;
         g_scan[index] = msg.ranges[i] * 1000.0;
     }
+    count = 0;
+    for (int i = 0; i < 60; i++) {
+        if (g_scan[i] > 5000) {
+            count++;
+        }
+    }
+    g_rightOpen = count > 15;
+    count = 0;
+    for (int i = 60; i < 120; i++) {
+        if (g_scan[i] > 5000) {
+            count++;
+        }
+    }
+    g_frontOpen = count > 15;
+    count = 0;
+    for (int i = 120; i < 181; i++) {
+        if (g_scan[i] > 5000) {
+            count++;
+        }
+    }
+    g_leftOpen = count > 15;
+    displayer.Clear();
+    displayer.UpdateSurrounding(g_scan);
+    int doorLeft;
+    int doorRight;
+    //left
+    doorLeft = LeftDetect();
+    //right
+    doorRight = RightDetect();
+    pub.publish(*DriveFreeSpace());
 }
 
 void velMessageReceived(const nav_msgs::Odometry &msg) {
@@ -388,6 +412,7 @@ void TeleopRosAria::keyLoop() {
             perror("read():");
             exit(-1);
         }
+        ros::spinOnce();
         linear_ = angular_ = 0;
         ROS_DEBUG("value: 0x%02X\n", c);
         switch (c) {
@@ -482,9 +507,6 @@ double GetAngle(double x1, double y1, double x2, double y2, double ori2) {
 }
 
 StateDisplay::StateDisplay() {
-    MyObject = imread("~/door.jpg",CV_LOAD_IMAGE_GRAYSCALE);
-    minHessian = 500;
-    tt = (double)cvGetTickCount();
     colorBlack.val[COLOR_BLUE] = 0;
     colorBlack.val[COLOR_GREEN] = 0;
     colorBlack.val[COLOR_RED] = 0;
@@ -502,8 +524,8 @@ StateDisplay::StateDisplay() {
     colorGreen.val[COLOR_RED] = 0;
     MyWindowName = "ChaoZ";
     MyLaserOffset = 125;
-    MyLaserMaxRange = 5000;
-    int scaleFactor = 15;
+    MyLaserMaxRange = 10000;
+    int scaleFactor = 30;
     MyScaleX = MyScaleY = scaleFactor;
     MyFrontLength = 313 / scaleFactor;
     MyHalfWidth = 253 / scaleFactor;
@@ -583,18 +605,21 @@ void StateDisplay::UpdateSurrounding(double *scan) {
 }
 
 int StateDisplay::SearchFreeSpace(double *scan, double distThres, int countThres, double angle) {
-    angle += 90;
+
     int count = 0;
     int mid = -1;
     int leftMid = -1;
     double radToDegree = DEGREE_TO_RAD;
     double rad;
+    double sumRange = 0.0;
+    double halfSumRange = 0.0;
     int i;
     Point midPoint, freeSpacePoint;
     for (i = 0; i < 181; i++) {
         if (scan[i] > distThres) {
             if (count == 0) mid = -1;
             count++;
+            sumRange += scan[i];
             rad = -i * radToDegree;
             freeSpacePoint.x = ((int) (scan[i] * cos(rad) / MyScaleX) + MyLaserPosition.x);
             freeSpacePoint.y = ((int) (scan[i] * sin(rad) / MyScaleY) + MyLaserPosition.y);
@@ -604,26 +629,39 @@ int StateDisplay::SearchFreeSpace(double *scan, double distThres, int countThres
         }
         if (scan[i] <= distThres) {
             if (count > countThres) {
-                mid = i - count / 2;
+                halfSumRange = 0;
+                for (int j = i - count; j < i; j++) {
+                    halfSumRange += scan[j];
+                    if (halfSumRange > sumRange / 2) {
+                        mid = j;
+                        break;
+                    }
+                }
+//                mid = i - count / 2;
                 rad = -mid * radToDegree;
                 if (scan[i] > MyLaserMaxRange) {
                     scan[i] = MyLaserMaxRange;
                 }
-                midPoint = Point(((int) (scan[i] * cos(rad) / MyScaleX) + MyLaserPosition.x),
-                                 ((int) (scan[i] * sin(rad) / MyScaleY) + MyLaserPosition.y));
+                midPoint = Point(((int) (scan[mid] * cos(rad) / MyScaleX) + MyLaserPosition.x),
+                                 ((int) (scan[mid] * sin(rad) / MyScaleY) + MyLaserPosition.y));
                 line(MyImage, MyLaserPosition, midPoint, Scalar(0, 255, 0));
+                if (leftMid == -1) {
+                    leftMid = mid;
+                }
                 if (abs(mid - angle) < abs(leftMid - angle)) {
                     leftMid = mid;
                 }
             }
             count = 0;
+            sumRange = 0;
+
         }
     }
 
     if (count > countThres && leftMid == -1) {
         leftMid = i - count / 2;
-        if (scan[i] > MyLaserMaxRange) {
-            scan[i] = MyLaserMaxRange;
+        if (scan[leftMid] > MyLaserMaxRange) {
+            scan[leftMid] = MyLaserMaxRange;
         }
     }
     if (leftMid >= 0) {
@@ -674,27 +712,70 @@ void StateDisplay::AddLaserPoint(double dist, double ang, Scalar color) {
 }
 
 geometry_msgs::Twist *DriveFreeSpace() {
+    int mid;
     geometry_msgs::Twist *msg = new geometry_msgs::Twist;
     msg->linear.y = msg->linear.z = msg->linear.x = 0.0;
     msg->angular.x = msg->angular.y = msg->angular.z = 0.0;
     ros::spinOnce();
     displayer.UpdateSurrounding(g_scan);
-    int mid = displayer.SearchFreeSpace(g_scan, 2000, 13, 90.0);
+    if (g_rightOpen) {
+        mid = displayer.SearchFreeSpace(g_scan, 3000, 12, 0);
+    } else if(g_frontOpen){
+        mid = displayer.SearchFreeSpace(g_scan, 3000, 12, 90);
+    }else if(g_leftOpen){
+        mid = displayer.SearchFreeSpace(g_scan, 3000, 12, 180);
+    }else{
+        mid = displayer.SearchFreeSpace(g_scan, 3000, 12, 90);
+    }
     displayer.DisplayImage();
-    msg->linear.x = 0.4;
+    msg->linear.x = 0.5;
     for (int i = 45; i < 135; i++) {
-        if (g_scan[i] < 500) {
+        if (g_scan[i] < 800) {
             msg->linear.x = 0;
             break;
         }
     }
     if (mid == -1) {
-        msg->angular.z = -90;
+        msg->linear.x = 0;
+        msg->angular.z = g_linear < 0.1 ? 90 : 0;
         return msg;
     }
     mid = (mid - 90);
     msg->angular.z = mid;
+    if (mid > 0) {
+        for (int i = 180; i > 90; i--) {
+            if (g_scan[i] < 500) {
+                msg->linear.x = 0;
+            }
+        }
+    }
+    if (mid > 30) {
+        msg->linear.x /= 2;
+    }
+    if (mid > 60) {
+        msg->linear.x = 0;
+    }
 
+    if (mid < 0) {
+        for (int i = 0; i < 90; i++) {
+            if (g_scan[i] < 500) {
+                msg->linear.x = 0;
+            }
+        }
+    }
+    if (mid < -30) {
+        msg->linear.x /= 2;
+    }
+    if (mid < -60) {
+        msg->linear.x = 0;
+    }
+    for (int i = 45; i < 135; i++) {
+        if (g_scan[i] < 600) {
+            msg->linear.x = 0;
+            break;
+        }
+    }
+    msg->angular.z = (msg->linear.x == 0) && (g_linear != 0) ? 0 : msg->angular.z;
     return msg;
 }
 
@@ -808,82 +889,6 @@ geometry_msgs::Twist *DriveWayPoint() {
 }
 
 void Train() {
-    static int count = 0;
-    static float totalErr = 0.0;
-    int next = 0;
-    count++;
-    ros::spinOnce();
-    float thisScan;
-    float sumScan;
-    float maximumScan;
-    float minimumScan;
-    float deltaScan = DELTA_SCAN;
-    float inputData[NN_NUM_INPUT];
-    float trainResult[NN_NUM_OUTPUT];
-
-    displayer.Clear();
-    maximumScan = 0.0;
-    minimumScan = 20000.0;
-    sumScan = 0.0;
-    for (int i = 0; i < 45; i++) {
-        displayer.UpdateSurrounding(g_scan);
-        displayer.AddLaserPoint(g_scan[i], i - 90, Scalar(0, 0, 255));
-        displayer.DisplayImage();
-        thisScan = (float) (g_scan[i] * cos(i * M_PI / 180));
-        sumScan+=thisScan;
-        if (maximumScan < thisScan) maximumScan = thisScan;
-        if (minimumScan > thisScan) {
-            minimumScan = thisScan;
-        }
-    }
-    inputData[0] = (maximumScan-minimumScan)/deltaScan;
-    inputData[1] = (sumScan/45 - minimumScan)/deltaScan;
-    for(int i=0;i<NN_NUM_INPUT-1;i++){
-        if(inputData[i]>1){
-            inputData[i] = 1;
-        }
-    }
-    inputData[NN_NUM_INPUT-1] = 1.0;
-    cout<<" max:"<<inputData[0]<<" avg:"<<inputData[1]<<" bias:"<<inputData[2]<<endl;
-//    cout<<" max:"<<maximumScan<<" avg:"<<inputData[1]<<" min:"<<minimumScan<<endl;
-    cout << "1 for door/ 0 for not door:";
-    cin >> trainResult[0];
-    cout << trainResult[0] << endl;
-    totalErr+=backprop(inputData, trainResult);
-    cout << "training " << count << " total err: " << totalErr << endl;
-    count++;
-
-    displayer.Clear();
-    maximumScan = 0.0;
-    minimumScan = 20000.0;
-    sumScan = 0.0;
-    for (int i = 180; i > 135; i--) {
-        displayer.UpdateSurrounding(g_scan);
-        displayer.AddLaserPoint(g_scan[i], i - 90, Scalar(0, 0, 255));
-        displayer.DisplayImage();
-        thisScan = (float) (g_scan[i] * cos((180 - i) * M_PI / 180));
-        sumScan+=thisScan;
-        if (maximumScan < thisScan) maximumScan = thisScan;
-        if (minimumScan > thisScan) {
-            minimumScan = thisScan;
-        }
-    }
-    inputData[0] = (maximumScan-minimumScan)/deltaScan;
-    inputData[1] = (sumScan/45-minimumScan)/deltaScan;
-    for (int i = 0; i<NN_NUM_INPUT-1;i++){
-        if(inputData[i]>1){
-            inputData[i] = 1;
-        }
-    }
-    inputData[NN_NUM_INPUT-1] = 1.0;
-    cout<<" max:"<<inputData[0]<<" avg:"<<inputData[1]<<" bias:"<<inputData[2]<<endl;
-//    cout<<" max:"<<maximumScan<<" avg:"<<inputData[1]<<" min:"<<minimumScan<<endl;
-    displayer.DisplayImage();
-    cout << "1 for door/ 0 for not door:";
-    cin >> trainResult[0];
-    cout << trainResult[0] << endl;
-    totalErr+=backprop(inputData, trainResult);
-    cout << "training " << count << " total err: " << totalErr << endl;
 
 }
 
@@ -891,151 +896,94 @@ void Detect() {
     ros::spinOnce();
     displayer.Clear();
     displayer.UpdateSurrounding(g_scan);
-    float maximumScan,minimumScan,sumScan,thisScan;
-    float inputData[NN_NUM_INPUT];
-    float deltaScan = DELTA_SCAN;
-
+    bool doorLeft = false;
+    bool doorRight = false;
     //left
-    maximumScan = 0.0;
-    minimumScan = 20000.0;
-    sumScan = 0.0;
-    for (int i = 180; i > 135; i--) {
-        thisScan = (float) (g_scan[i] * cos((180-i) * M_PI / 180));
-        sumScan+=thisScan;
-        if (maximumScan < thisScan) maximumScan = thisScan;
-        if (minimumScan > thisScan) {
-            minimumScan = thisScan;
-        }
-    }
-    inputData[0] = (maximumScan-minimumScan)/deltaScan;
-    inputData[1] = (sumScan/45-minimumScan)/deltaScan;
-    for (int i = 0; i<NN_NUM_INPUT-1;i++){
-        if(inputData[i]>1){
-            inputData[i] = 1;
-        }
-    }
-    inputData[NN_NUM_INPUT-1] = 1.0;
-    feedforward(inputData);
-    if (g_out[0]>0.5) {
-        for (int i = 180; i > 135; i--) {
-            displayer.AddLaserPoint(g_scan[i], i - 90, Scalar(0, 0, 255));
-        }
-    }
-    cout<<" left:"<<g_out[0];
-
+    doorLeft = LeftDetect();
     //right
-    maximumScan = 0.0;
-    minimumScan = 20000.0;
-    sumScan = 0.0;
+    doorRight = RightDetect();
 
+}
+
+int LeftDetect() {
+    double inputData[45];
+    double maximumScan = 0.0;
+    double minimumScan = 20000.0;
+    double averageScan = 0.0;
+    double sumScan = 0.0;
+    int count = 0;
+    for (int i = 180; i > 135; i--) {
+        inputData[180 - i] = (g_scan[i] * cos((180 - i) * M_PI / 180));
+        sumScan += inputData[180 - i];
+        if (maximumScan < inputData[180 - i]) maximumScan = inputData[180 - i];
+        if (minimumScan > inputData[180 - i]) {
+            minimumScan = inputData[180 - i];
+        }
+    }
+    averageScan = sumScan / 45;
+
+    if (maximumScan - minimumScan < 80 || maximumScan - minimumScan > minimumScan) {
+        displayer.DisplayImage();
+        return 0;
+    }
+
+    if (minimumScan < 0.9 * inputData[0]) {
+        displayer.DisplayImage();
+        return 0;
+    }
+    if (maximumScan - minimumScan > 100) {
+        for (int i = 180; i > 135; i--) {
+            if (inputData[180 - i] > averageScan) {
+                displayer.AddLaserPoint(g_scan[i], i - 90, Scalar(0, 0, 255));
+                count++;
+            }
+        }
+        displayer.DisplayImage();
+        return count;
+    }
+}
+
+int RightDetect() {
+    int count = 0;
+    double inputData[45];
+    double maximumScan = 0.0;
+    double minimumScan = 20000.0;
+    double averageScan = 0.0;
+    double sumScan = 0.0;
     for (int i = 0; i < 45; i++) {
-        thisScan = (float) (g_scan[i] * cos(i * M_PI / 180));
-        sumScan+=thisScan;
-        if (maximumScan < thisScan) maximumScan = thisScan;
-        if (minimumScan > thisScan) {
-            minimumScan = thisScan;
+        inputData[i] = (g_scan[i] * cos((i) * M_PI / 180));
+        sumScan += inputData[i];
+        if (maximumScan < inputData[i]) maximumScan = inputData[i];
+        if (minimumScan > inputData[i]) {
+            minimumScan = inputData[i];
         }
     }
-    inputData[0] = (maximumScan-minimumScan)/deltaScan;
-    inputData[1] = (sumScan/45-minimumScan)/deltaScan;
-    for (int i = 0; i<NN_NUM_INPUT-1;i++){
-        if(inputData[i]>1){
-            inputData[i] = 1;
-        }
+    averageScan = sumScan / 45;
+
+    if (maximumScan - minimumScan < 80 || maximumScan - minimumScan > minimumScan) {
+        displayer.DisplayImage();
+        return 0;
     }
-    inputData[NN_NUM_INPUT-1] = 1.0;
-    feedforward(inputData);
-    if (g_out[0]>0.5) {
+
+    if (minimumScan < 0.9 * inputData[0]) {
+        displayer.DisplayImage();
+        return 0;
+    }
+
+    if (maximumScan - minimumScan > 100) {
         for (int i = 0; i < 45; i++) {
-            displayer.AddLaserPoint(g_scan[i], i - 90, Scalar(0, 0, 255));
+            if (inputData[i] > averageScan) {
+                displayer.AddLaserPoint(g_scan[i], i - 90, Scalar(0, 0, 255));
+                count++;
+            }
         }
+        displayer.DisplayImage();
+        return count;
     }
-    cout<<"right:"<<g_out[0]<<endl;
-    displayer.DisplayImage();
 }
 
 void Print() {
     //Print weight or save in file;
-    ofstream fs;
-    fs.open("weight1.csv");
-    for (int i = 0; i < NN_NUM_INPUT; i++) {
-        for (int j = 0; j < NN_NUM_HIDEN_NN; j++) {
-            fs << g_weight1[i][j] << endl;
-        }
-    }
-    fs.close();
-    fs.open("weight2.csv");
-    for (int i = 0; i < NN_NUM_HIDEN_NN; i++) {
-        for (int j = 0; j < NN_NUM_OUTPUT; j++) {
-            fs << g_weight2[i][j] << endl;
-        }
-    }
-    fs.close();
-    cout << "print done" << endl;
 
-}
 
-float sigmoid(float x) {
-    return 1.0 / (1.0 + exp(-x));
-}
-
-void feedforward(float *input) {
-    for (int i = 0; i < NN_NUM_INPUT; i++) g_input[i] = input[i];  // input layer
-    for (int i = 0; i < NN_NUM_HIDEN_NN-1; i++) {
-        g_outHidden[i] = 0.0;
-        for (int j = 0; j < NN_NUM_INPUT; j++) {
-            g_outHidden[i] += g_input[j] * g_weight1[j][i];
-        }
-        g_outHidden[i] = sigmoid(g_outHidden[i]);
-    }
-    g_outHidden[NN_NUM_HIDEN_NN-1] = 1.0;
-    for (int i = 0; i < NN_NUM_OUTPUT; i++) {
-        g_out[i] = 0.0;
-        for (int j = 0; j < NN_NUM_HIDEN_NN; j++) {
-            g_out[i] += g_outHidden[j] * g_weight2[j][i];
-        }
-        g_out[i] = sigmoid(g_out[i]);
-    }
-}
-
-float backprop(float train_in[], float train_sol[]) {
-    float err_total, errHidden[NN_NUM_HIDEN_NN], errOut[NN_NUM_OUTPUT], diffHidden[NN_NUM_HIDEN_NN], diffOut[NN_NUM_OUTPUT];
-
-    //run network, calculate difference to desired output
-    feedforward(train_in);
-    err_total = 0.0;
-
-    // A. Calculate output error and output Diff
-    for (int i = 0; i < NN_NUM_OUTPUT; i++)                   // for all OUTPUT neurons
-    {
-        errOut[i] = train_sol[i] - g_out[i]; // compare true solution with NN solution
-        err_total += errOut[i] * errOut[i];   // square error function
-        diffOut[i] = errOut[i] * (1.0 - g_out[i]) * g_out[i];
-    }
-
-    // B. Work backwards through all layers
-    for (int i = 0; i < NN_NUM_HIDEN_NN; i++) {
-        diffHidden[i] = 0.0;
-        for (int j = 0; j < NN_NUM_OUTPUT; j++) {
-            diffHidden[i] += diffOut[j] * g_weight2[i][j] * (1.0 - g_outHidden[i]) * g_outHidden[i];
-            g_weight2[i][j] += STEP_SIZE * diffOut[j] * g_outHidden[i];
-        }
-    }
-
-    for (int i = 0; i < NN_NUM_INPUT; i++) {
-        for (int j = 0; j < NN_NUM_HIDEN_NN; j++) {
-            g_weight1[i][j] += STEP_SIZE * diffHidden[j] * g_input[i];
-        }
-    }
-    return err_total;
-}
-
-void init_weights() {
-    for (int i = 0; i < NN_NUM_INPUT; i++)
-        for (int j = 0; j < NN_NUM_HIDEN_NN; j++)
-            g_weight1[i][j] = (double) rand() / ((double) RAND_MAX * (float) NN_NUM_INPUT);
-
-    for (int i = 0; i < NN_NUM_HIDEN_NN; i++)
-        for (int j = 0; j < NN_NUM_OUTPUT; j++)
-            g_weight2[i][j] = (double) rand() / ((double) RAND_MAX * (float) NN_NUM_HIDEN_NN);
 }
