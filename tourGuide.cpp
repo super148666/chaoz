@@ -7,6 +7,7 @@
 #include <fstream>
 #include <signal.h>
 #include <termios.h>
+#include "QRDetect.cpp"
 
 #define NUM_WAYPOINT 25
 #define DIST_THRES 1000
@@ -720,11 +721,11 @@ geometry_msgs::Twist *DriveFreeSpace() {
     displayer.UpdateSurrounding(g_scan);
     if (g_rightOpen) {
         mid = displayer.SearchFreeSpace(g_scan, 3000, 12, 0);
-    } else if(g_frontOpen){
+    } else if (g_frontOpen) {
         mid = displayer.SearchFreeSpace(g_scan, 3000, 12, 90);
-    }else if(g_leftOpen){
+    } else if (g_leftOpen) {
         mid = displayer.SearchFreeSpace(g_scan, 3000, 12, 180);
-    }else{
+    } else {
         mid = displayer.SearchFreeSpace(g_scan, 3000, 12, 90);
     }
     displayer.DisplayImage();
