@@ -3,93 +3,66 @@
 //
 
 #include "tourGuide.h"
+#include <Aria.h>
+#include <fstream>
+#include <signal.h>
+#include <termios.h>
 
 #define NUM_WAYPOINT 25
 #define DIST_THRES 1000
+#define KEYCODE_R 100   //d
+#define KEYCODE_L 97    //a
+#define KEYCODE_U 119   //w
+#define KEYCODE_D 115   //s
+#define KEYCODE_Q 113   //q
+#define KEYCODE_P 112   //p
+#define KEYCODE_SPACE 32    //' '
+#define KEYCODE_RACE 114    //r
+#define KEYCODE_T 116   //t
+#define KEYCODE_O 111   //o
+#define KEYCODE_I 105   //i
 
-geometry_msgs::PoseWithCovarianceStamped::_pose_type::_pose_type g_currentPose;
-//nav_msgs::Odometry::_pose_type::_pose_type g_currentPose;
+//NN SETTING
+#define NN_NUM_INPUT 3
+#define NN_NUM_HIDEN_NN 10
+#define NN_NUM_OUTPUT 1
+#define STEP_SIZE 1
+#define DELTA_SCAN 200.0
+
+float g_weight1[NN_NUM_INPUT][NN_NUM_HIDEN_NN];
+float g_weight2[NN_NUM_HIDEN_NN][NN_NUM_OUTPUT];
+float g_input[NN_NUM_INPUT];
+float g_outHidden[NN_NUM_HIDEN_NN];
+float g_out[NN_NUM_OUTPUT];
+
+//geometry_msgs::PoseWithCovarianceStamped::_pose_type::_pose_type g_currentPose;
+nav_msgs::Odometry::_pose_type::_pose_type g_currentPose;
 StateDisplay displayer;
 geometry_msgs::Pose::_position_type g_waypoint[NUM_WAYPOINT];
 double g_scan[181];
 double g_tansVel = 0.0;
 double g_rotVel = 0.0;
 ros::Publisher pub;
-//perfect with no wheel error - from mobile sim
-//void InitGlobalVariables() {
-//    for (int i = 0; i < NUM_WAYPOINT; i++) {
-//        g_waypoint[i].z = 0.0;
-//    }
-//    g_waypoint[0].x = 0.0;
-//    g_waypoint[0].y = 0.0;
-//
-//    g_waypoint[1].x = 1188.11;
-//    g_waypoint[1].y = -4654.41;
-//
-//    g_waypoint[2].x = 6076.21;
-//    g_waypoint[2].y = -4658.01;
-//
-//    g_waypoint[3].x = 11599.7;
-//    g_waypoint[3].y = -4374.04;
-//
-//    g_waypoint[4].x = 16916.6;
-//    g_waypoint[4].y = -4345.23;
-//
-//    g_waypoint[5].x = 19250.6;
-//    g_waypoint[5].y = -4330.14;
-//
-//    g_waypoint[6].x = 22167.5;
-//    g_waypoint[6].y = -4315.79;
-//
-//    g_waypoint[7].x = 25720.5;
-//    g_waypoint[7].y = -4297.87;
-//
-//    g_waypoint[8].x = 25762.7;
-//    g_waypoint[8].y = -5942.66;
-//
-//    g_waypoint[9].x = 25768.7;
-//    g_waypoint[9].y = -8260.66;
-//
-//    g_waypoint[10].x = 25775.8;
-//    g_waypoint[10].y = -10942.7;
-//
-//    g_waypoint[11].x = 25779.3;
-//    g_waypoint[11].y = -12290.7;
-//
-//    g_waypoint[12].x = 29497.7;
-//    g_waypoint[12].y = -12342.8;
-//
-//    g_waypoint[13].x = 31455.8;
-//    g_waypoint[13].y = -12539.8;
-//
-//    g_waypoint[14].x = 36012.5;
-//    g_waypoint[14].y = -12480.3;
-//
-//    g_waypoint[15].x = 38177.5;
-//    g_waypoint[15].y = -12463.2;
-//
-//    g_waypoint[16].x = 41265.4;
-//    g_waypoint[16].y = -12437.8;
-//
-//    g_waypoint[17].x = 25476.2;
-//    g_waypoint[17].y = 10562.0;
-//
-//    g_waypoint[18].x = 25308.5;
-//    g_waypoint[18].y = 17285.2;
-//
-//    g_waypoint[19].x = 25540.1;
-//    g_waypoint[19].y = 25375.6;
-//
-//    g_waypoint[20].x = 25167.8;
-//    g_waypoint[20].y = 32743.6;
-//
-//    g_waypoint[21].x = 25118.6;
-//    g_waypoint[21].y = 37065.4;
-//
-//    g_waypoint[22].x = 25076.0;
-//    g_waypoint[22].y = 38784.2;
-//
-//}
+
+int kfd = 0;
+struct termios cooked, raw;
+
+
+class TeleopRosAria {
+public:
+    TeleopRosAria();
+
+    void keyLoop();
+
+private:
+    ros::NodeHandle nh_;
+    double linear_, angular_, l_scale_, a_scale_;
+    ros::Publisher twist_pub_;
+    ros::Subscriber pose_sub_;
+};
+
+void quit(int sig);
+
 
 //with imu & ekf
 //void InitGlobalVariables() {
@@ -153,57 +126,115 @@ ros::Publisher pub;
 //}
 
 //with imu & ekf with same linear speed
+//void InitGlobalVariables() {
+//    g_waypoint[0].x = 0;
+//    g_waypoint[0].y = 0;
+//    g_waypoint[1].x = 2.80797;
+//    g_waypoint[1].y = -0.0161297;
+//    g_waypoint[2].x = 5.723;
+//    g_waypoint[2].y = 0.0469143;
+//    g_waypoint[3].x = 11.1869;
+//    g_waypoint[3].y = 0.342565;
+//    g_waypoint[4].x = 16.9077;
+//    g_waypoint[4].y = 0.132684;
+//    g_waypoint[5].x = 19.358;
+//    g_waypoint[5].y = 0.287418;
+//    g_waypoint[6].x = 22.178;
+//    g_waypoint[6].y = 0.335201;
+//    g_waypoint[7].x = 25.3527;
+//    g_waypoint[7].y = 0.495888;
+//    g_waypoint[8].x = 25.4903;
+//    g_waypoint[8].y = -1.95358;
+//    g_waypoint[9].x = 25.6442;
+//    g_waypoint[9].y = -4.41105;
+//    g_waypoint[10].x = 25.9217;
+//    g_waypoint[10].y = -7.71921;
+//    g_waypoint[11].x = 30.3027;
+//    g_waypoint[11].y = -7.96171;
+//    g_waypoint[12].x = 32.6672;
+//    g_waypoint[12].y = -7.80257;
+//    g_waypoint[13].x = 37.0167;
+//    g_waypoint[13].y = -7.61941;
+//    g_waypoint[14].x = 39.4157;
+//    g_waypoint[14].y = -7.70562;
+//    g_waypoint[15].x = 42.636;
+//    g_waypoint[15].y = -7.96717;
+//    g_waypoint[16].x = 25.6802;
+//    g_waypoint[16].y = -7.02406;
+//    g_waypoint[17].x = 32.7937;
+//    g_waypoint[17].y = 11.687;
+//    g_waypoint[18].x = 34.2015;
+//    g_waypoint[18].y = 18.0466;
+//    g_waypoint[19].x = 35.7156;
+//    g_waypoint[19].y = 24.0776;
+//    g_waypoint[20].x = 37.7418;
+//    g_waypoint[20].y = 32.6346;
+//    g_waypoint[21].x = 39.8222;
+//    g_waypoint[21].y = 40.5733;
+//    g_waypoint[22].x = 40.9479;
+//    g_waypoint[22].y = 44.38;
+//    g_waypoint[23].x = 41.5406;
+//    g_waypoint[23].y = 46.3659;
+//    g_waypoint[24].x = 36.7649;
+//    g_waypoint[24].y = 31.739;
+//    for (int i = 0; i < NUM_WAYPOINT; i++) {
+//        g_waypoint[i].z = 0;
+//        g_waypoint[i].x *= 1000.0;
+//        g_waypoint[i].y *= 1000.0;
+//    }
+//}
+
 void InitGlobalVariables() {
     g_waypoint[0].x = 0;
     g_waypoint[0].y = 0;
-    g_waypoint[1].x = 2.80797;
-    g_waypoint[1].y = -0.0161297;
-    g_waypoint[2].x = 5.723;
-    g_waypoint[2].y = 0.0469143;
-    g_waypoint[3].x = 11.1869;
-    g_waypoint[3].y = 0.342565;
-    g_waypoint[4].x = 16.9077;
-    g_waypoint[4].y = 0.132684;
-    g_waypoint[5].x = 19.358;
-    g_waypoint[5].y = 0.287418;
-    g_waypoint[6].x = 22.178;
-    g_waypoint[6].y = 0.335201;
-    g_waypoint[7].x = 25.3527;
-    g_waypoint[7].y = 0.495888;
-    g_waypoint[8].x = 25.4903;
-    g_waypoint[8].y = -1.95358;
-    g_waypoint[9].x = 25.6442;
-    g_waypoint[9].y = -4.41105;
-    g_waypoint[10].x = 25.9217;
-    g_waypoint[10].y = -7.71921;
-    g_waypoint[11].x = 30.3027;
-    g_waypoint[11].y = -7.96171;
-    g_waypoint[12].x = 32.6672;
-    g_waypoint[12].y = -7.80257;
-    g_waypoint[13].x = 37.0167;
-    g_waypoint[13].y = -7.61941;
-    g_waypoint[14].x = 39.4157;
-    g_waypoint[14].y = -7.70562;
-    g_waypoint[15].x = 42.636;
-    g_waypoint[15].y = -7.96717;
-    g_waypoint[16].x = 25.6802;
-    g_waypoint[16].y = -7.02406;
-    g_waypoint[17].x = 32.7937;
-    g_waypoint[17].y = 11.687;
-    g_waypoint[18].x = 34.2015;
-    g_waypoint[18].y = 18.0466;
-    g_waypoint[19].x = 35.7156;
-    g_waypoint[19].y = 24.0776;
-    g_waypoint[20].x = 37.7418;
-    g_waypoint[20].y = 32.6346;
-    g_waypoint[21].x = 39.8222;
-    g_waypoint[21].y = 40.5733;
-    g_waypoint[22].x = 40.9479;
-    g_waypoint[22].y = 44.38;
-    g_waypoint[23].x = 41.5406;
-    g_waypoint[23].y = 46.3659;
-    g_waypoint[24].x = 36.7649;
-    g_waypoint[24].y = 31.739;
+    g_waypoint[1].x = 1.797;
+    g_waypoint[1].y = 0;
+    g_waypoint[2].x = 4.499;
+    g_waypoint[2].y = 0.127;
+    g_waypoint[3].x = 9.762;
+    g_waypoint[3].y = 0.268;
+    g_waypoint[4].x = 15.451;
+    g_waypoint[4].y = 0.305;
+    g_waypoint[5].x = 17.389;
+    g_waypoint[5].y = 0.309;
+    g_waypoint[6].x = 20.627;
+    g_waypoint[6].y = 0.315;
+    g_waypoint[7].x = 23.465;
+    g_waypoint[7].y = 0.32;
+    g_waypoint[8].x = 23.467;
+    g_waypoint[8].y = -1.884;
+    g_waypoint[9].x = 23.469;
+    g_waypoint[9].y = -4.16;
+    g_waypoint[10].x = 23.471;
+    g_waypoint[10].y = -7.004;
+    g_waypoint[11].x = 27.881;
+    g_waypoint[11].y = -8.101;
+    g_waypoint[12].x = 30.189;
+    g_waypoint[12].y = -8.01;
+    g_waypoint[13].x = 34.408;
+    g_waypoint[13].y = -8.002;
+    g_waypoint[14].x = 36.873;
+    g_waypoint[14].y = -7.997;
+    g_waypoint[15].x = 39.756;
+    g_waypoint[15].y = -7.992;
+    g_waypoint[16].x = 23.686;
+    g_waypoint[16].y = -7.717;
+    g_waypoint[17].x = 23.989;
+    g_waypoint[17].y = 10.496;
+    g_waypoint[18].x = 23.756;
+    g_waypoint[18].y = 15.693;
+    g_waypoint[19].x = 23.55;
+    g_waypoint[19].y = 22.716;
+    g_waypoint[20].x = 23.72;
+    g_waypoint[20].y = 30.899;
+    g_waypoint[21].x = 23.406;
+    g_waypoint[21].y = 38.486;
+    g_waypoint[22].x = 23.365;
+    g_waypoint[22].y = 42.497;
+    g_waypoint[23].x = 23.329;
+    g_waypoint[23].y = 46.106;
+    g_waypoint[24].x = 23.591;
+    g_waypoint[24].y = 29.231;
     for (int i = 0; i < NUM_WAYPOINT; i++) {
         g_waypoint[i].z = 0;
         g_waypoint[i].x *= 1000.0;
@@ -211,63 +242,229 @@ void InitGlobalVariables() {
     }
 }
 
-//void InitGlobalVariables() {
-//    g_waypoint[0].x = 0;
-//    g_waypoint[0].y = 0;
-//    g_waypoint[1].x = 1.797;
-//    g_waypoint[1].y = 0;
-//    g_waypoint[2].x = 4.499;
-//    g_waypoint[2].y = 0.127;
-//    g_waypoint[3].x = 9.762;
-//    g_waypoint[3].y = 0.268;
-//    g_waypoint[4].x = 15.451;
-//    g_waypoint[4].y = 0.305;
-//    g_waypoint[5].x = 17.389;
-//    g_waypoint[5].y = 0.309;
-//    g_waypoint[6].x = 20.627;
-//    g_waypoint[6].y = 0.315;
-//    g_waypoint[7].x = 23.465;
-//    g_waypoint[7].y = 0.32;
-//    g_waypoint[8].x = 23.467;
-//    g_waypoint[8].y = -1.884;
-//    g_waypoint[9].x = 23.469;
-//    g_waypoint[9].y = -4.16;
-//    g_waypoint[10].x = 23.471;
-//    g_waypoint[10].y = -7.004;
-//    g_waypoint[11].x = 27.881;
-//    g_waypoint[11].y = -8.101;
-//    g_waypoint[12].x = 30.189;
-//    g_waypoint[12].y = -8.01;
-//    g_waypoint[13].x = 34.408;
-//    g_waypoint[13].y = -8.002;
-//    g_waypoint[14].x = 36.873;
-//    g_waypoint[14].y = -7.997;
-//    g_waypoint[15].x = 39.756;
-//    g_waypoint[15].y = -7.992;
-//    g_waypoint[16].x = 23.686;
-//    g_waypoint[16].y = -7.717;
-//    g_waypoint[17].x = 23.989;
-//    g_waypoint[17].y = 10.496;
-//    g_waypoint[18].x = 23.756;
-//    g_waypoint[18].y = 15.693;
-//    g_waypoint[19].x = 23.55;
-//    g_waypoint[19].y = 22.716;
-//    g_waypoint[20].x = 23.72;
-//    g_waypoint[20].y = 30.899;
-//    g_waypoint[21].x = 23.406;
-//    g_waypoint[21].y = 38.486;
-//    g_waypoint[22].x = 23.365;
-//    g_waypoint[22].y = 42.497;
-//    g_waypoint[23].x = 23.329;
-//    g_waypoint[23].y = 46.106;
-//    g_waypoint[24].x = 23.591;
-//    g_waypoint[24].y = 29.231;
-//    for (int i = 0; i < NUM_WAYPOINT; i++) {
-//        g_waypoint[i].z = 0;
-//        g_waypoint[i].x *= 1000.0;
-//        g_waypoint[i].y *= 1000.0;
+double GetDistance(double x1, double y1, double x2, double y2);
+
+double GetAngle(double x1, double y1, double x2, double y2, double ori2);
+
+geometry_msgs::Twist *DriveFreeSpace();
+
+geometry_msgs::Twist *DriveWayPoint();
+
+
+
+
+//void poseMessageReceived(const geometry_msgs::PoseWithCovarianceStamped &msg) {
+//    g_currentPose = msg.pose.pose;
+//    g_currentPose.orientation.w = atan2(g_currentPose.orientation.z, g_currentPose.orientation.w) * 2 / M_PI * 180;
+//    if (g_currentPose.orientation.w < -180) {
+//        g_currentPose.orientation.w += 360;
 //    }
+//    if (g_currentPose.orientation.w > 180) {
+//        g_currentPose.orientation.w -= 360;
+//    }
+//    pub.publish(*DriveWayPoint());
 //}
+
+void poseMessageReceived(const nav_msgs::Odometry &msg);
+
+void laserMessageReceived(const sensor_msgs::LaserScan &msg);
+
+void velMessageReceived(const nav_msgs::Odometry &msg);
+
+void feedforward(float *input);
+
+float sigmoid(float x);
+
+float backprop(float train_in[], float train_sol[]);
+
+void init_weights();
+
+void Train();
+
+void Detect();
+
+void Print();
+
+int main(int argc, char **argv) {
+    InitGlobalVariables();
+    init_weights();
+
+
+    ros::init(argc, argv, "state_display");
+    ros::NodeHandle nh;
+
+    pub = nh.advertise<geometry_msgs::Twist>("RosAria/cmd_vel", 1000);
+    geometry_msgs::Twist msg;
+    cout << "publisher to cmd_vel done" << endl;
+    ros::Subscriber vel;
+    vel = nh.subscribe("RosAria/pose", 1000, &velMessageReceived);
+    ros::Subscriber pose;
+//    pose = nh.subscribe("robot_pose_ekf/odom_combined", 1000, &poseMessageReceived);
+    pose = nh.subscribe("RosAria/pose", 1000, &poseMessageReceived);
+    cout << "subscriber to pose done" << endl;
+    ros::Subscriber laser;
+//    laser = nh.subscribe("RosAria/lms1xx_1_laserscan", 1000, &laserMessageReceived);
+    laser = nh.subscribe("RosAria/sim_lms1xx_1_laserscan", 1000, &laserMessageReceived);
+    cout << "subscriber to laserscan done" << endl;
+
+    msg.linear.x = 0;
+    msg.linear.y = 0;
+    msg.linear.z = 0;
+    msg.angular.x = 0;
+    msg.angular.y = 0;
+    msg.angular.z = 0;
+    pub.publish(msg);
+    cout << "configure state display done" << endl;
+
+    TeleopRosAria teleop_RosAria;
+    signal(SIGINT, quit);
+    teleop_RosAria.keyLoop();
+
+//    ros::spin();
+
+
+    return (0);
+}
+
+void poseMessageReceived(const nav_msgs::Odometry &msg) {
+    g_currentPose = msg.pose.pose;
+    g_currentPose.orientation.w = atan2(g_currentPose.orientation.z, g_currentPose.orientation.w) * 2 / M_PI * 180;
+    if (g_currentPose.orientation.w < -180) {
+        g_currentPose.orientation.w += 360;
+    }
+    if (g_currentPose.orientation.w > 180) {
+        g_currentPose.orientation.w -= 360;
+    }
+//    pub.publish(*DriveWayPoint());
+}
+
+void laserMessageReceived(const sensor_msgs::LaserScan &msg) {
+    int index = 0;
+    for (int i = 90; i < 451; i = i + 2) {
+        index = (i - 90) / 2;
+        g_scan[index] = msg.ranges[i] * 1000.0;
+    }
+}
+
+void velMessageReceived(const nav_msgs::Odometry &msg) {
+    g_tansVel = msg.twist.twist.linear.x * 1000.0;
+    g_rotVel = msg.twist.twist.angular.z / M_PI * 180;
+}
+
+void quit(int sig) {
+    tcsetattr(kfd, TCSANOW, &cooked);
+    ros::shutdown();
+    exit(0);
+}
+
+void TeleopRosAria::keyLoop() {
+    static bool raceMode = false;
+    l_scale_ = 5000;
+    a_scale_ = 500;
+    if (raceMode) {
+        l_scale_ = 10000;
+        a_scale_ = 1000;
+    }
+
+    static int count = 0;
+    char c;
+    bool dirty = false;
+    // get the console in raw mode
+    tcgetattr(kfd, &cooked);
+    memcpy(&raw, &cooked, sizeof(struct termios));
+    raw.c_lflag &= ~(ICANON | ECHO);
+    // Setting a new line, then end of file
+    raw.c_cc[VEOL] = 1;
+    raw.c_cc[VEOF] = 2;
+    tcsetattr(kfd, TCSANOW, &raw);
+    puts("Reading from keyboard");
+    puts("---------------------------");
+    puts("Use arrow keys to move the robot.");
+    puts("Press the space bar to stop the robot.");
+    puts("Press q to stop the program");
+    for (;;) {
+        // get the next event from the keyboard
+        if (read(kfd, &c, 1) < 0) {
+            perror("read():");
+            exit(-1);
+        }
+        linear_ = angular_ = 0;
+        ROS_DEBUG("value: 0x%02X\n", c);
+        switch (c) {
+            case KEYCODE_L:
+                ROS_DEBUG("LEFT");
+                angular_ = 0.1;
+                linear_ = 0;
+                dirty = true;
+                break;
+            case KEYCODE_R:
+                ROS_DEBUG("RIGHT");
+                angular_ = -0.1;
+                linear_ = 0;
+                dirty = true;
+                break;
+            case KEYCODE_U:
+                ROS_DEBUG("UP");
+                linear_ = 0.1;
+                angular_ = 0;
+                dirty = true;
+                break;
+            case KEYCODE_D:
+                ROS_DEBUG("DOWN");
+                linear_ = -0.1;
+                angular_ = 0;
+                dirty = true;
+                break;
+            case KEYCODE_SPACE:
+                ROS_DEBUG("STOP");
+                linear_ = 0;
+                angular_ = 0;
+                dirty = true;
+                break;
+            case KEYCODE_Q:
+                ROS_DEBUG("QUIT");
+                ROS_INFO_STREAM("You quit the teleop successfully");
+                return;
+                break;
+            case KEYCODE_P:
+                Print();
+                break;
+            case KEYCODE_T:
+                Train();
+                break;
+            case KEYCODE_I:
+                Detect();
+                break;
+            case KEYCODE_RACE:
+                if (!raceMode) {
+                    raceMode = true;
+                    std::cout << "Race Mode ON!!" << std::endl;
+                } else {
+                    raceMode = false;
+                    std::cout << "Race Mode OFF." << std::endl;
+                }
+                break;
+        }
+        geometry_msgs::Twist twist;
+        twist.angular.z = a_scale_ * angular_;
+        twist.linear.x = l_scale_ * linear_;
+        if (dirty == true) {
+            twist_pub_.publish(twist);
+            dirty = false;
+        }
+    }
+    return;
+}
+
+TeleopRosAria::TeleopRosAria() :
+        linear_(0),
+        angular_(0),
+        l_scale_(2.0),
+        a_scale_(2.0) {
+    nh_.param("scale_angular", a_scale_, a_scale_);
+    nh_.param("scale_linear", l_scale_, l_scale_);
+    twist_pub_ = nh_.advertise<geometry_msgs::Twist>("RosAria/cmd_vel", 1);
+}
 
 double GetDistance(double x1, double y1, double x2, double y2) {
     return sqrt(pow(x1 - x2, 2) + pow(y1 - y2, 2));
@@ -285,6 +482,14 @@ double GetAngle(double x1, double y1, double x2, double y2, double ori2) {
 }
 
 StateDisplay::StateDisplay() {
+    MyObject = imread("~/door.jpg",CV_LOAD_IMAGE_GRAYSCALE);
+    if( !MyObject.data )
+    {
+        std::cout<< "Error reading object " << std::endl;
+        exit (-1);
+    }
+    minHessian = 500;
+    tt = (double)cvGetTickCount();
     colorBlack.val[COLOR_BLUE] = 0;
     colorBlack.val[COLOR_GREEN] = 0;
     colorBlack.val[COLOR_RED] = 0;
@@ -435,19 +640,19 @@ int StateDisplay::SearchFreeSpace(double *scan, double distThres, int countThres
     return leftMid;
 }
 
-void StateDisplay::AddWayPoint(double dist, double ang) {
+void StateDisplay::AddWayPoint(double dist, double ang, Scalar color) {
     Point waypoint;
     double rad;
     rad = ang * DEGREE_TO_RAD;
     if (dist > MyLaserMaxRange) {
-        dist = MyLaserMaxRange-15;
+        dist = MyLaserMaxRange - 15;
     }
-    waypoint.x = ((int) (dist * - sin(rad) / MyScaleX) + MyRobotPosition.x);
-    waypoint.y = ((int) (dist * - cos(rad) / MyScaleY) + MyRobotPosition.y);
-    if(waypoint.y>MyRobotPosition.y){
+    waypoint.x = ((int) (dist * -sin(rad) / MyScaleX) + MyRobotPosition.x);
+    waypoint.y = ((int) (dist * -cos(rad) / MyScaleY) + MyRobotPosition.y);
+    if (waypoint.y > MyRobotPosition.y) {
         waypoint.y = MyRobotPosition.y;
     }
-    circle(MyImage,waypoint,10,Scalar(0,0,255),-1);
+    circle(MyImage, waypoint, 2, color, -1);
 }
 
 void StateDisplay::Clear() {
@@ -455,12 +660,23 @@ void StateDisplay::Clear() {
 }
 
 void StateDisplay::SaveImage(string name) {
-    imwrite(name,MyImage);
+    imwrite(name, MyImage);
 }
-//void poseMessageReceived(const geometry_msgs::PoseWithCovarianceStamped &msg) {
-//    g_currentPose = msg.pose.pose;
-////    cout << "pose received" << endl;
-//}
+
+void StateDisplay::AddLaserPoint(double dist, double ang, Scalar color) {
+    Point waypoint;
+    double rad;
+    rad = ang * DEGREE_TO_RAD;
+    if (dist > MyLaserMaxRange) {
+        dist = MyLaserMaxRange - 15;
+    }
+    waypoint.x = ((int) (dist * -sin(rad) / MyScaleX) + MyLaserPosition.x);
+    waypoint.y = ((int) (dist * -cos(rad) / MyScaleY) + MyLaserPosition.y);
+    if (waypoint.y > MyLaserPosition.y) {
+        waypoint.y = MyLaserPosition.y;
+    }
+    circle(MyImage, waypoint, 2, color, -1);
+}
 
 geometry_msgs::Twist *DriveFreeSpace() {
     geometry_msgs::Twist *msg = new geometry_msgs::Twist;
@@ -502,29 +718,56 @@ geometry_msgs::Twist *DriveWayPoint() {
         reach = false;
         currentWayPoint++;
     }
+
+    // passing first narrow door;
+    if (currentWayPoint == 1) {
+        double dist = GetDistance(g_waypoint[currentWayPoint].x, g_waypoint[currentWayPoint].y,
+                                  g_currentPose.position.x * 1000.0, g_currentPose.position.y * 1000.0);
+        double angle = GetAngle(g_waypoint[currentWayPoint].x, g_waypoint[currentWayPoint].y,
+                                g_currentPose.position.x * 1000.0, g_currentPose.position.y * 1000.0,
+                                g_currentPose.orientation.w);
+        displayer.Clear();
+        displayer.UpdateSurrounding(g_scan);
+        int mid = displayer.SearchFreeSpace(g_scan, 5000, 5, 0);
+        displayer.AddWayPoint(dist, angle, Scalar(0, 0, 255));
+        displayer.DisplayImage();
+        if (mid == -1) {
+            msg->angular.z = -30;
+            return msg;
+        }
+        mid = (mid - 90);
+        msg->angular.z = mid;
+
+        return msg;
+    }
+
     if (currentWayPoint >= NUM_WAYPOINT) {
         cout << "reach final" << endl;
         exit(0);
     }
+
     double dist = GetDistance(g_waypoint[currentWayPoint].x, g_waypoint[currentWayPoint].y,
                               g_currentPose.position.x * 1000.0, g_currentPose.position.y * 1000.0);
-    if (dist < DIST_THRES) {
-        reach = true;
-        stringstream sstm;
-        sstm<<"waypoint"<<currentWayPoint<<".jpg";
-        displayer.SaveImage(sstm.str());
-        return msg;
-    }
     double angle = GetAngle(g_waypoint[currentWayPoint].x, g_waypoint[currentWayPoint].y,
                             g_currentPose.position.x * 1000.0, g_currentPose.position.y * 1000.0,
                             g_currentPose.orientation.w);
+    if (dist < DIST_THRES) {
+        reach = true;
+        stringstream sstm;
+        sstm << "waypoint" << currentWayPoint << ".jpg";
+        displayer.SaveImage(sstm.str());
+        return msg;
+    }
+
+
     displayer.Clear();
     displayer.UpdateSurrounding(g_scan);
     int mid = displayer.SearchFreeSpace(g_scan, 2000, 15, 0);
-    displayer.AddWayPoint(dist, angle);
+    displayer.AddWayPoint(dist, angle, Scalar(0, 0, 255));
     displayer.DisplayImage();
     msg->linear.x = 0.4;
     cout << "dist to waypoint " << currentWayPoint << " is " << dist << "mm with " << angle << "degree" << endl;
+
     if (currentWayPoint < 3) {
         if (angle == 0) {
             msg->angular.z = 0;
@@ -540,18 +783,21 @@ geometry_msgs::Twist *DriveWayPoint() {
         }
         return msg;
     }
-    for (int i = 0; i < 181; i++) {
-        if (g_scan[i] < 400) {
-            msg->linear.x = 0;
-            break;
+    if (currentWayPoint > 3) {
+
+        for (int i = 0; i < 181; i++) {
+            if (g_scan[i] < 400) {
+                msg->linear.x = 0;
+                break;
+            }
         }
     }
-    if(abs(angle)>90){
+    if (abs(angle) > 90) {
         msg->linear.x = 0;
         msg->angular.z = angle > 0 ? 30 : -30;
         return msg;
     }
-    if (abs(angle) > 45 && g_scan[(int)angle+90]>dist) {
+    if (abs(angle) > 45 && g_scan[(int) angle + 90] > dist) {
         msg->linear.x = 0;
         msg->angular.z = angle > 0 ? 30 : -30;
         return msg;
@@ -566,65 +812,235 @@ geometry_msgs::Twist *DriveWayPoint() {
     return msg;
 }
 
+void Train() {
+    static int count = 0;
+    static float totalErr = 0.0;
+    int next = 0;
+    count++;
+    ros::spinOnce();
+    float thisScan;
+    float sumScan;
+    float maximumScan;
+    float minimumScan;
+    float deltaScan = DELTA_SCAN;
+    float inputData[NN_NUM_INPUT];
+    float trainResult[NN_NUM_OUTPUT];
 
-void poseMessageReceived(const geometry_msgs::PoseWithCovarianceStamped &msg) {
-    g_currentPose = msg.pose.pose;
-    g_currentPose.orientation.w = atan2(g_currentPose.orientation.z, g_currentPose.orientation.w) * 2 / M_PI * 180;
-    if (g_currentPose.orientation.w < -180) {
-        g_currentPose.orientation.w += 360;
+    displayer.Clear();
+    maximumScan = 0.0;
+    minimumScan = 20000.0;
+    sumScan = 0.0;
+    for (int i = 0; i < 45; i++) {
+        displayer.UpdateSurrounding(g_scan);
+        displayer.AddLaserPoint(g_scan[i], i - 90, Scalar(0, 0, 255));
+        displayer.DisplayImage();
+        thisScan = (float) (g_scan[i] * cos(i * M_PI / 180));
+        sumScan+=thisScan;
+        if (maximumScan < thisScan) maximumScan = thisScan;
+        if (minimumScan > thisScan) {
+            minimumScan = thisScan;
+        }
     }
-    if (g_currentPose.orientation.w > 180) {
-        g_currentPose.orientation.w -= 360;
+    inputData[0] = (maximumScan-minimumScan)/deltaScan;
+    inputData[1] = (sumScan/45 - minimumScan)/deltaScan;
+    for(int i=0;i<NN_NUM_INPUT-1;i++){
+        if(inputData[i]>1){
+            inputData[i] = 1;
+        }
     }
-    pub.publish(*DriveWayPoint());
+    inputData[NN_NUM_INPUT-1] = 1.0;
+    cout<<" max:"<<inputData[0]<<" avg:"<<inputData[1]<<" bias:"<<inputData[2]<<endl;
+//    cout<<" max:"<<maximumScan<<" avg:"<<inputData[1]<<" min:"<<minimumScan<<endl;
+    cout << "1 for door/ 0 for not door:";
+    cin >> trainResult[0];
+    cout << trainResult[0] << endl;
+    totalErr+=backprop(inputData, trainResult);
+    cout << "training " << count << " total err: " << totalErr << endl;
+    count++;
+
+    displayer.Clear();
+    maximumScan = 0.0;
+    minimumScan = 20000.0;
+    sumScan = 0.0;
+    for (int i = 180; i > 135; i--) {
+        displayer.UpdateSurrounding(g_scan);
+        displayer.AddLaserPoint(g_scan[i], i - 90, Scalar(0, 0, 255));
+        displayer.DisplayImage();
+        thisScan = (float) (g_scan[i] * cos((180 - i) * M_PI / 180));
+        sumScan+=thisScan;
+        if (maximumScan < thisScan) maximumScan = thisScan;
+        if (minimumScan > thisScan) {
+            minimumScan = thisScan;
+        }
+    }
+    inputData[0] = (maximumScan-minimumScan)/deltaScan;
+    inputData[1] = (sumScan/45-minimumScan)/deltaScan;
+    for (int i = 0; i<NN_NUM_INPUT-1;i++){
+        if(inputData[i]>1){
+            inputData[i] = 1;
+        }
+    }
+    inputData[NN_NUM_INPUT-1] = 1.0;
+    cout<<" max:"<<inputData[0]<<" avg:"<<inputData[1]<<" bias:"<<inputData[2]<<endl;
+//    cout<<" max:"<<maximumScan<<" avg:"<<inputData[1]<<" min:"<<minimumScan<<endl;
+    displayer.DisplayImage();
+    cout << "1 for door/ 0 for not door:";
+    cin >> trainResult[0];
+    cout << trainResult[0] << endl;
+    totalErr+=backprop(inputData, trainResult);
+    cout << "training " << count << " total err: " << totalErr << endl;
+
 }
 
-void laserMessageReceived(const sensor_msgs::LaserScan &msg) {
-    int index = 0;
-    for (int i = 90; i < 451; i = i + 2) {
-        index = (i - 90) / 2;
-        g_scan[index] = msg.ranges[i] * 1000.0;
+void Detect() {
+    ros::spinOnce();
+    displayer.Clear();
+    displayer.UpdateSurrounding(g_scan);
+    float maximumScan,minimumScan,sumScan,thisScan;
+    float inputData[NN_NUM_INPUT];
+    float deltaScan = DELTA_SCAN;
+
+    //left
+    maximumScan = 0.0;
+    minimumScan = 20000.0;
+    sumScan = 0.0;
+    for (int i = 180; i > 135; i--) {
+        thisScan = (float) (g_scan[i] * cos((180-i) * M_PI / 180));
+        sumScan+=thisScan;
+        if (maximumScan < thisScan) maximumScan = thisScan;
+        if (minimumScan > thisScan) {
+            minimumScan = thisScan;
+        }
+    }
+    inputData[0] = (maximumScan-minimumScan)/deltaScan;
+    inputData[1] = (sumScan/45-minimumScan)/deltaScan;
+    for (int i = 0; i<NN_NUM_INPUT-1;i++){
+        if(inputData[i]>1){
+            inputData[i] = 1;
+        }
+    }
+    inputData[NN_NUM_INPUT-1] = 1.0;
+    feedforward(inputData);
+    if (inputData[0]>0.5) {
+        for (int i = 180; i > 135; i--) {
+            displayer.AddLaserPoint(g_scan[i], i - 90, Scalar(0, 0, 255));
+        }
+    }
+    cout<<" left:"<<inputData[0];
+
+    //right
+    maximumScan = 0.0;
+    minimumScan = 20000.0;
+    sumScan = 0.0;
+
+    for (int i = 0; i < 45; i++) {
+        thisScan = (float) (g_scan[i] * cos(i * M_PI / 180));
+        sumScan+=thisScan;
+        if (maximumScan < thisScan) maximumScan = thisScan;
+        if (minimumScan > thisScan) {
+            minimumScan = thisScan;
+        }
+    }
+    inputData[0] = (maximumScan-minimumScan)/deltaScan;
+    inputData[1] = (sumScan/45-minimumScan)/deltaScan;
+    for (int i = 0; i<NN_NUM_INPUT-1;i++){
+        if(inputData[i]>1){
+            inputData[i] = 1;
+        }
+    }
+    inputData[NN_NUM_INPUT-1] = 1.0;
+    feedforward(inputData);
+    if (inputData[0]>0.5) {
+        for (int i = 0; i < 45; i++) {
+            displayer.AddLaserPoint(g_scan[i], i - 90, Scalar(0, 0, 255));
+        }
+    }
+    cout<<"right:"<<inputData[0]<<endl;
+    displayer.DisplayImage();
+}
+
+void Print() {
+    //Print weight or save in file;
+    ofstream fs;
+    fs.open("weight1.csv");
+    for (int i = 0; i < NN_NUM_INPUT; i++) {
+        for (int j = 0; j < NN_NUM_HIDEN_NN; j++) {
+            fs << g_weight1[i][j] << endl;
+        }
+    }
+    fs.close();
+    fs.open("weight2.csv");
+    for (int i = 0; i < NN_NUM_HIDEN_NN; i++) {
+        for (int j = 0; j < NN_NUM_OUTPUT; j++) {
+            fs << g_weight2[i][j] << endl;
+        }
+    }
+    fs.close();
+    cout << "print done" << endl;
+
+}
+
+float sigmoid(float x) {
+    return 1.0 / (1.0 + exp(-x));
+}
+
+void feedforward(float *input) {
+    for (int i = 0; i < NN_NUM_INPUT; i++) g_input[i] = input[i];  // input layer
+    for (int i = 0; i < NN_NUM_HIDEN_NN-1; i++) {
+        g_outHidden[i] = 0.0;
+        for (int j = 0; j < NN_NUM_INPUT; j++) {
+            g_outHidden[i] += g_input[j] * g_weight1[j][i];
+        }
+        g_outHidden[i] = sigmoid(g_outHidden[i]);
+    }
+    g_outHidden[NN_NUM_HIDEN_NN-1] = 1.0;
+    for (int i = 0; i < NN_NUM_OUTPUT; i++) {
+        g_out[i] = 0.0;
+        for (int j = 0; j < NN_NUM_HIDEN_NN; j++) {
+            g_out[i] += g_outHidden[j] * g_weight2[j][i];
+        }
+        g_out[i] = sigmoid(g_out[i]);
     }
 }
 
-void velMessageReceived(const nav_msgs::Odometry &msg) {
-    g_tansVel = msg.twist.twist.linear.x * 1000.0;
-    g_rotVel = msg.twist.twist.angular.z / M_PI * 180;
+float backprop(float train_in[], float train_sol[]) {
+    float err_total, errHidden[NN_NUM_HIDEN_NN], errOut[NN_NUM_OUTPUT], diffHidden[NN_NUM_HIDEN_NN], diffOut[NN_NUM_OUTPUT];
+
+    //run network, calculate difference to desired output
+    feedforward(train_in);
+    err_total = 0.0;
+
+    // A. Calculate output error and output Diff
+    for (int i = 0; i < NN_NUM_OUTPUT; i++)                   // for all OUTPUT neurons
+    {
+        errOut[i] = train_sol[i] - g_out[i]; // compare true solution with NN solution
+        err_total += errOut[i] * errOut[i];   // square error function
+        diffOut[i] = errOut[i] * (1.0 - g_out[i]) * g_out[i];
+    }
+
+    // B. Work backwards through all layers
+    for (int i = 0; i < NN_NUM_HIDEN_NN; i++) {
+        diffHidden[i] = 0.0;
+        for (int j = 0; j < NN_NUM_OUTPUT; j++) {
+            diffHidden[i] += diffOut[j] * g_weight2[i][j] * (1.0 - g_outHidden[i]) * g_outHidden[i];
+            g_weight2[i][j] += STEP_SIZE * diffOut[j] * g_outHidden[i];
+        }
+    }
+
+    for (int i = 0; i < NN_NUM_INPUT; i++) {
+        for (int j = 0; j < NN_NUM_HIDEN_NN; j++) {
+            g_weight1[i][j] += STEP_SIZE * diffHidden[j] * g_input[i];
+        }
+    }
+    return err_total;
 }
 
+void init_weights() {
+    for (int i = 0; i < NN_NUM_INPUT; i++)
+        for (int j = 0; j < NN_NUM_HIDEN_NN; j++)
+            g_weight1[i][j] = (double) rand() / ((double) RAND_MAX * (float) NN_NUM_INPUT);
 
-int main(int argc, char **argv) {
-    InitGlobalVariables();
-
-    ros::init(argc, argv, "state_display");
-    ros::NodeHandle nh;
-
-    pub = nh.advertise<geometry_msgs::Twist>("RosAria/cmd_vel", 1000);
-    geometry_msgs::Twist msg;
-    cout << "publisher to cmd_vel done" << endl;
-    ros::Subscriber vel;
-    vel = nh.subscribe("RosAria/pose", 1000, &velMessageReceived);
-    ros::Subscriber pose;
-    pose = nh.subscribe("robot_pose_ekf/odom_combined", 1000, &poseMessageReceived);
-//    pose = nh.subscribe("RosAria/pose", 1000, &poseMessageReceived);
-    cout << "subscriber to pose done" << endl;
-    ros::Subscriber laser;
-    laser = nh.subscribe("RosAria/lms1xx_1_laserscan", 1000, &laserMessageReceived);
-    cout << "subscriber to laserscan done" << endl;
-
-    msg.linear.x = 0;
-    msg.linear.y = 0;
-    msg.linear.z = 0;
-    msg.angular.x = 0;
-    msg.angular.y = 0;
-    msg.angular.z = 0;
-    pub.publish(msg);
-    cout << "configure state display done" << endl;
-
-
-    ros::spin();
-
-
-    return (0);
+    for (int i = 0; i < NN_NUM_HIDEN_NN; i++)
+        for (int j = 0; j < NN_NUM_OUTPUT; j++)
+            g_weight2[i][j] = (double) rand() / ((double) RAND_MAX * (float) NN_NUM_HIDEN_NN);
 }
-

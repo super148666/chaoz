@@ -14,6 +14,8 @@
 #include <geometry_msgs/PoseWithCovarianceStamped.h>
 #include <nav_msgs/Odometry.h>
 #include <opencv2/opencv.hpp>
+#include "opencv2/features2d/features2d.hpp"
+
 #include <iostream>
 #include <string>
 
@@ -29,6 +31,7 @@ using namespace std;
 
 class StateDisplay{
 private:
+    Mat MyObject;
     Mat MyImage;
     Mat MyBackground;
     Size MySize;
@@ -46,13 +49,16 @@ private:
     Vec3b colorGreen;
     int MyFrontLength;
     int MyHalfWidth;
+    int minHessian;
+    double tt;
 public:
     explicit StateDisplay();
     void DisplayImage();
     void DisplayBackground();
     void UpdateSurrounding(double* scan);
     int SearchFreeSpace(double* scan, double distThres, int countThres, double angle);
-    void AddWayPoint(double dist, double ang);
+    void AddWayPoint(double dist, double ang, Scalar color);
+    void AddLaserPoint(double dist, double ang, Scalar color);
     void Clear();
     void SaveImage(string name);
 };

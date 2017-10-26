@@ -28,6 +28,153 @@ void positionMessageReceived(const geometry_msgs::PoseWithCovarianceStamped &msg
 //    g_currentPose = msg.pose.pose;
 //}
 
+void MoveForward() {
+    geometry_msgs::Twist msg;
+    msg.linear.x = 250;
+    msg.linear.y = 0;
+    msg.linear.z = 0;
+    msg.angular.x = 0;
+    msg.angular.y = 0;
+    msg.angular.z = 0;
+    pub.publish(msg);
+}
+
+void MoveBackward() {
+    geometry_msgs::Twist msg;
+    msg.linear.x = -250;
+    msg.linear.y = 0;
+    msg.linear.z = 0;
+    msg.angular.x = 0;
+    msg.angular.y = 0;
+    msg.angular.z = 0;
+    pub.publish(msg);
+}
+
+void TurnRight() {
+    geometry_msgs::Twist msg;
+    msg.linear.x = 0;
+    msg.linear.y = 0;
+    msg.linear.z = 0;
+    msg.angular.x = 0;
+    msg.angular.y = 0;
+    msg.angular.z = -25;
+    pub.publish(msg);
+}
+
+void TurnLeft() {
+    geometry_msgs::Twist msg;
+    msg.linear.x = 0;
+    msg.linear.y = 0;
+    msg.linear.z = 0;
+    msg.angular.x = 0;
+    msg.angular.y = 0;
+    msg.angular.z = 25;
+    pub.publish(msg);
+}
+
+void Stop() {
+    geometry_msgs::Twist msg;
+    msg.linear.x = 0;
+    msg.linear.y = 0;
+    msg.linear.z = 0;
+    msg.angular.x = 0;
+    msg.angular.y = 0;
+    msg.angular.z = 0;
+    pub.publish(msg);
+}
+
+void Train() {
+    static int count = 0;
+    cout << "training " << count << endl;
+    count++;
+    ros::spinOnce();
+    double maximumScan = 0;
+    double inputData[91];
+    double trainResult[90];
+    for (int i = 0; i < 45; i++) {
+        displayer.UpdateSurrounding(g_scan);
+        displayer.DisplayImage();
+        displayer.AddWayPoint(g_scan[i], i - 90, Scalar(0, 0, 255));
+        displayer.DisplayImage();
+        inputData[i] = g_scan[i];
+        if (maximumScan < g_scan[i]) maximumScan = g_scan[i];
+        cout << "1 for door/ 0 for not door:";
+        cin >> trainResult[i];
+    }
+    for (int i = 180; i > 135; i--) {
+        displayer.UpdateSurrounding(g_scan);
+        displayer.DisplayImage();
+        displayer.AddWayPoint(g_scan[i], i - 90, Scalar(0, 0, 255));
+        displayer.DisplayImage();
+        inputData[180 - i] = g_scan[i];
+        if (maximumScan < g_scan[i]) maximumScan = g_scan[i];
+        cout << "1 for door/ 0 for not door:";
+        cin >> trainResult[180 - i];
+    }
+    for (int i = 0; i < 90; i++) {
+        inputData[i] /= maximumScan;
+    }
+    inputData[91] = 1.0;
+    backprop(inputData,trainResult);
+    //train
+}
+
+void Detect() {
+    double maximumScan = 0;
+    double inputData[90];
+    for (int i = 0; i < 45; i++) {
+        inputData[i] = g_scan[i];
+        if (maximumScan < g_scan[i]) maximumScan = g_scan[i];
+    }
+    for (int i = 180; i > 135; i--) {
+        inputData[180 - i] = g_scan[i];
+        if (maximumScan < g_scan[i]) maximumScan = g_scan[i];
+    }
+    for (int i = 0; i < 90; i++) {
+        inputData[i] /= maximumScan;
+    }
+    inputData[91] = 1.0;
+    // FeedForward
+    feedforward(inputData);
+    displayer.Clear();
+    displayer.UpdateSurrounding(g_scan);
+    displayer.DisplayImage();
+    for (int i = 0; i < 45; i++) {
+        if (g_out[i] > 0.5) {
+            displayer.AddWayPoint(g_scan[i], i - 90, Scalar(0, 0, 255));
+//            displayer.DisplayImage();
+        }
+    }
+    for (int i = 180; i > 135; i--) {
+        if (g_out[180 - i] > 0.5) {
+            displayer.AddWayPoint(g_scan[i], i - 90, Scalar(0, 0, 255));
+//            displayer.DisplayImage();
+        }
+    }
+    displayer.DisplayImage();
+}
+
+void Print() {
+    //Print weight or save in file;
+    ofstream fs;
+    fs.open("weight1.csv");
+    for(int i=0;i<NN_NUM_INPUT;i++){
+        for(int j=0;j<NN_NUM_HIDEN_NN;j++){
+            fs<<g_weight1[i][j]<<endl;
+        }
+    }
+    fs.close();
+    fs.open("weight2.csv");
+    for(int i=0;i<NN_NUM_HIDEN_NN;i++){
+        for(int j=0;j<NN_NUM_OUTPUT;j++){
+            fs<<g_weight2[i][j]<<endl;
+        }
+    }
+    fs.close();
+    cout<<"print done"<<endl;
+
+}
+
 class TeleopRosAria
 {
 public:
@@ -58,14 +205,6 @@ void quit(int sig)
     tcsetattr(kfd, TCSANOW, &cooked);
     ros::shutdown();
     exit(0);
-}
-int main(int argc, char** argv)
-{
-    ros::init(argc, argv, "teleop_RosAria");
-    TeleopRosAria teleop_RosAria;
-    signal(SIGINT,quit);
-    teleop_RosAria.keyLoop();
-    return(0);
 }
 void TeleopRosAria::keyLoop()
 {
@@ -166,4 +305,12 @@ void TeleopRosAria::keyLoop()
         }
     }
     return;
+}
+int main(int argc, char** argv)
+{
+    ros::init(argc, argv, "teleop_RosAria");
+    TeleopRosAria teleop_RosAria;
+    signal(SIGINT,quit);
+    teleop_RosAria.keyLoop();
+    return(0);
 }
