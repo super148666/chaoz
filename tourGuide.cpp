@@ -336,6 +336,7 @@ double GetAngle(double x1, double y1, double x2, double y2, double ori2) {
 
 geometry_msgs::Twist *DriveFreeSpace() {
     int mid;
+    static set<string> visited;
     geometry_msgs::Twist *msg = new geometry_msgs::Twist;
     msg->linear.y = msg->linear.z = msg->linear.x = 0.0;
     msg->angular.x = msg->angular.y = msg->angular.z = 0.0;
@@ -362,21 +363,16 @@ geometry_msgs::Twist *DriveFreeSpace() {
     for(int i=0;i<1;i++) {
         string QRMessage = g_giveMeCode.readQR();
         if (!QRMessage.empty()) {
-            int roomNum = atoi(QRMessage.c_str());
-            switch (roomNum) {
-                case 1:
-                    static bool visited = false;
-                    if (visited) break;
-                    pub.publish(*msg);
-                    while (g_linear > 100) {
-                        ros::spinOnce();
-                    }
-                    sleep(5);
-                    cout << "get code" << endl;
-                    visited = true;
-                    break;
-                default:
-                    break;
+            //check if it's in the visited set
+            if(!(visited.find(QRMessage) != visited.end())){
+              visited.insert(QRMessage);
+              pub.publish(*msg);
+              while (g_linear > 100) {
+                  ros::spinOnce();
+              }
+              system("play -q beep.wav");
+              cout << "get code " << QRMessage << endl;
+              sleep(5);
             }
         }
     }
