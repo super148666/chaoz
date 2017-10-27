@@ -25,7 +25,7 @@ double g_angular = 0.0;
 bool g_leftOpen = false;
 bool g_rightOpen = false;
 bool g_frontOpen = false;
-QRDetector g_giveMeCode(0);
+QRDetector g_giveMeCode(1);
 
 //with imu & ekf
 //void InitGlobalVariables() {
@@ -261,12 +261,15 @@ int main(int argc, char **argv) {
     pub.publish(msg);
     cout << "configure state display done" << endl;
 
-    while(waitKey(10)!=27){
-        displayer.DisplayBackground();
-    }
+//    while(waitKey(10)!=27){
+//        displayer.DisplayBackground();
+//    }
 //    ros::spin();
-
-
+    displayer.Clear();
+    displayer.UpdateSurrounding(g_scan);
+    while(waitKey(10)!=27) {
+        pub.publish(*DriveFreeSpace());
+    }
     return (0);
 }
 
@@ -313,15 +316,6 @@ void laserMessageReceived(const sensor_msgs::LaserScan &msg) {
         }
     }
     g_leftOpen = count > 15;
-    displayer.Clear();
-    displayer.UpdateSurrounding(g_scan);
-    int doorLeft;
-    int doorRight;
-    //left
-    doorLeft = LeftDetect();
-    //right
-    doorRight = RightDetect();
-    pub.publish(*DriveFreeSpace());
 }
 
 double GetDistance(double x1, double y1, double x2, double y2) {
@@ -346,30 +340,49 @@ geometry_msgs::Twist *DriveFreeSpace() {
     msg->linear.y = msg->linear.z = msg->linear.x = 0.0;
     msg->angular.x = msg->angular.y = msg->angular.z = 0.0;
     ros::spinOnce();
+    displayer.Clear();
     displayer.UpdateSurrounding(g_scan);
+    displayer.MotionEstimate(g_linear,g_angular);
     if (g_rightOpen) {
-        mid = displayer.SearchFreeSpace(g_scan, 3000, 12, 0);
+        cout<<"right"<<endl;
+        mid = displayer.SearchFreeSpace(g_scan, 2500, 12, 90);
+        if(mid>120)
+        mid = displayer.SearchFreeSpace(g_scan, 2500, 12, 0);
     } else if (g_frontOpen) {
-        mid = displayer.SearchFreeSpace(g_scan, 3000, 12, 90);
+        cout<<"front"<<endl;
+        mid = displayer.SearchFreeSpace(g_scan, 2500, 12, 90);
     } else if (g_leftOpen) {
-        mid = displayer.SearchFreeSpace(g_scan, 3000, 12, 180);
+        cout<<"left"<<endl;
+        mid = displayer.SearchFreeSpace(g_scan, 2500, 12, 180);
     } else {
-        mid = displayer.SearchFreeSpace(g_scan, 3000, 12, 90);
+        cout<<"front"<<endl;
+        mid = displayer.SearchFreeSpace(g_scan, 2500, 12, 90);
     }
     displayer.DisplayImage();
-    string QRMessage=g_giveMeCode.readQR();
-    if(!QRMessage.empty()) {
-        int roomNum = atoi(QRMessage.c_str());
-        switch (roomNum) {
-            case 1:
-
-            default:
-                break;
+    for(int i=0;i<1;i++) {
+        string QRMessage = g_giveMeCode.readQR();
+        if (!QRMessage.empty()) {
+            int roomNum = atoi(QRMessage.c_str());
+            switch (roomNum) {
+                case 1:
+                    static bool visited = false;
+                    if (visited) break;
+                    pub.publish(*msg);
+                    while (g_linear > 100) {
+                        ros::spinOnce();
+                    }
+                    sleep(5);
+                    cout << "get code" << endl;
+                    visited = true;
+                    break;
+                default:
+                    break;
+            }
         }
     }
-    msg->linear.x = 0.5;
-    for (int i = 45; i < 135; i++) {
-        if (g_scan[i] < 800) {
+    msg->linear.x = 0.4;
+    for (int i = 75; i < 105; i++) {
+        if (g_scan[i] < 650) {
             msg->linear.x = 0;
             break;
         }
@@ -389,27 +402,27 @@ geometry_msgs::Twist *DriveFreeSpace() {
         }
     }
     if (mid > 30) {
-        msg->linear.x /= 2;
+        msg->linear.x /= 0.40;
     }
     if (mid > 60) {
-        msg->linear.x = 0;
+        msg->linear.x /= 0.35;
     }
 
     if (mid < 0) {
-        for (int i = 0; i < 90; i++) {
-            if (g_scan[i] < 500) {
+        for (int i = 45; i < 90; i++) {
+            if (g_scan[i] < 400) {
                 msg->linear.x = 0;
             }
         }
     }
     if (mid < -30) {
-        msg->linear.x /= 2;
+        msg->linear.x /= 0.4;
     }
     if (mid < -60) {
-        msg->linear.x = 0;
+        msg->linear.x /= 0.35;
     }
     for (int i = 45; i < 135; i++) {
-        if (g_scan[i] < 600) {
+        if (g_scan[i] < 400) {
             msg->linear.x = 0;
             break;
         }
@@ -616,3 +629,51 @@ int RightDetect() {
         return count;
     }
 }
+
+//
+//int main (int argc, const char * argv[])
+//{
+//    VideoCapture cap=VideoCapture(0);
+//    cap.set(CV_CAP_PROP_FRAME_WIDTH, 320);
+//    cap.set(CV_CAP_PROP_FRAME_HEIGHT, 240);
+//    if (!cap.isOpened())
+//        return -1;
+//
+//    Mat frame;
+//    HOGDescriptor hog;
+//    hog.setSVMDetector(HOGDescriptor::getDefaultPeopleDetector());
+//
+//    namedWindow("video capture", CV_WINDOW_AUTOSIZE);
+//    while (true)
+//    {
+//        cap >> frame;
+//        if (!frame.data)
+//            continue;
+//        vector<Rect> detected, detected_filtered;
+//        hog.detectMultiScale(frame, detected, 0, Size(8,8), Size(16,16), 1.06, 2);
+//        size_t i, j;
+//        /*checking for the distinctly detected human in a frame*/
+//        for (i=0; i<detected.size(); i++)
+//        {
+//            Rect r = detected[i];
+//            for (j=0; j<detected.size(); j++)
+//                if (j!=i && (r & detected[j]) == r)
+//                    break;
+//            if (j== detected.size())
+//                detected_filtered.push_back(r);
+//        }
+//        /*for each distinctly detected human draw rectangle around it*/
+//        for (i=0; i<detected_filtered.size(); i++)
+//        {
+//            Rect r = detected_filtered[i];
+//            r.x += cvRound(r.width*0.1);
+//            r.width = cvRound(r.width*0.8);
+//            r.y += cvRound(r.height*0.07);
+//            r.height = cvRound(r.height*0.8);
+//            rectangle(frame, r.tl(), r.br(), Scalar(0,0,255), 2);
+//        }        imshow("video capture", frame);
+//        if (waitKey(10) >= 0)
+//            break;
+//    }
+//    return 0;
+//}

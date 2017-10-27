@@ -33,8 +33,16 @@ public:
             exit(EXIT_FAILURE);
         }
         cvtColor(frame, grey, CV_BGR2GRAY);
+
         int width = frame.cols;
         int height = frame.rows;
+//        for(int i=0;i<grey.cols;i++){
+//            for(int j=0;j<grey.rows;j++){
+//                if(grey.at<uchar>(i,j)<80){
+//                    grey.at<uchar>(i,j) = 0;
+//                }
+//            }
+//        }
         uchar *raw = (uchar *) grey.data;
         // wrap image data
         Image image(width, height, "Y800", raw, width * height);
