@@ -5,7 +5,7 @@
 #include "StateDisplay.h"
 
 
-StateDisplay::StateDisplay() {
+StateDisplay::StateDisplay(int videoSrc) {
     colorBlack.val[COLOR_BLUE] = 0;
     colorBlack.val[COLOR_GREEN] = 0;
     colorBlack.val[COLOR_RED] = 0;
@@ -61,6 +61,14 @@ StateDisplay::StateDisplay() {
     MySize.width = (int) (2 * MyLaserMaxRange / MyScaleX);
     MySize.height = (int) (MyLaserMaxRange / MyScaleY);
     namedWindow(MyWindowName, CV_GUI_NORMAL | WINDOW_AUTOSIZE);
+    cvSetWindowProperty(MyWindowName.c_str(), CV_WND_PROP_FULLSCREEN, CV_WINDOW_FULLSCREEN);
+    cap = VideoCapture(videoSrc);
+    if (!cap.isOpened()) { // if not success, exit program
+        cout << "Cannot open the video cam" << endl;
+        exit(EXIT_FAILURE);
+    }
+    scanner.set_config(ZBAR_NONE, ZBAR_CFG_ENABLE, 1);
+    namedWindow("MyVideo", CV_WINDOW_AUTOSIZE);
 }
 
 void StateDisplay::DisplayImage() {
@@ -223,26 +231,91 @@ void StateDisplay::AddLaserPoint(double dist, double ang, Scalar color) {
 }
 
 void StateDisplay::MotionEstimate(double linearVel, double angularVel) {
+//    if(linearVel*1000.0<50) linearVel = 50/1000.0;
     double angleStep = angularVel * TIME_STEP;
-    double lengthStep = linearVel * TIME_STEP;
+    double lengthStep = linearVel * TIME_STEP * 1000.0;
     Point lastEstimate;
     Point estimatePath;
     double angle, length;
     lastEstimate = MyRobotPosition;
     for (int i = 1; i < 100; i++) {
-        angle = angleStep * i;
-        length = lengthStep * i;
-        estimatePath = Point(static_cast<int>(sin(-angle) * length / MyScaleX + lastEstimate.x),
-                             static_cast<int>(-cos(angle) * length / MyScaleY + lastEstimate.y));
+        angle = angleStep*i;
+        length = lengthStep;
+        estimatePath = Point((int)(sin(-angle) * length / MyScaleX + lastEstimate.x),
+                             (int)(-cos(angle) * length / MyScaleY + lastEstimate.y));
         if (estimatePath.y > MyRobotPosition.y) break;
-        circle(MyImage,estimatePath,2,Scalar(255,0,0),-1);
+        if (estimatePath.y < 0) break;
+        if (abs(estimatePath.x - MyRobotPosition.x) > MyRobotPosition.x) break;
+        if (sqrt(pow(estimatePath.x-MyRobotPosition.x,2)+pow(estimatePath.y-MyRobotPosition.y,2))>200) break;
+        line(MyImage,estimatePath,lastEstimate,Scalar(255,0,0),2);
+//        circle(MyImage,estimatePath,1,Scalar(255,0,0),-1);
         lastEstimate = estimatePath;
     }
     stringstream strstream;
     strstream<<(int)(linearVel*1000);
     putText(MyImage,strstream.str(),Point(MyImage.cols-101,12),FONT_HERSHEY_PLAIN, 1, Scalar(0, 0, 0));
-    strstream<<(int)(angularVel*180/M_PI);
-    putText(MyImage,strstream.str(),Point(MyImage.cols-101,24),FONT_HERSHEY_PLAIN, 1, Scalar(0, 0, 0));
+    stringstream strstream1;
+    strstream1<<(int)(angularVel*180/M_PI);
+    putText(MyImage,strstream1.str(),Point(MyImage.cols-101,24),FONT_HERSHEY_PLAIN, 1, Scalar(0, 0, 0));
 
 
+}
+
+string StateDisplay::readQR() {
+    Mat frame, grey;
+    string result;
+    bool bSuccess = cap.read(frame); // read a new frame from video
+    if (!bSuccess) {
+        cout << "Cannot read a frame from video stream" << endl;
+        exit(EXIT_FAILURE);
+    }
+    cvtColor(frame, grey, CV_BGR2GRAY);
+
+    int width = frame.cols;
+    int height = frame.rows;
+//        for(int i=0;i<grey.cols;i++){
+//            for(int j=0;j<grey.rows;j++){
+//                if(grey.at<uchar>(i,j)<80){
+//                    grey.at<uchar>(i,j) = 0;
+//                }
+//            }
+//        }
+    uchar *raw = (uchar *) grey.data;
+    // wrap image data
+    Image image(width, height, "Y800", raw, width * height);
+    // scan the image for barcodes
+    int n = scanner.scan(image);
+    // extract results
+    for (Image::SymbolIterator symbol = image.symbol_begin(); symbol != image.symbol_end(); ++symbol) {
+        vector<Point> vp;
+        result = symbol->get_data();
+        int n = symbol->get_location_size();
+        for (int i = 0; i < n; i++) {
+            vp.push_back(Point(symbol->get_location_x(i), symbol->get_location_y(i)));
+        }
+        RotatedRect r = minAreaRect(vp);
+        Point2f pts[4];
+        r.points(pts);
+        for (int i = 0; i < 4; i++) {
+            line(frame, pts[i], pts[(i + 1) % 4], Scalar(255, 0, 0), 3);
+        }
+    }
+
+
+    imshow("MyVideo", frame); //show the frame in "MyVideo" window
+//    frame.copyTo(MyImage(Rect(0,MyImage.rows-height/2,width/2,height/2)));
+    waitKey(1);
+    return result;
+}
+
+void StateDisplay::AddRoomText(string QRMessage,bool clear){
+    static int count = 0;
+    if(clear){
+        count = 0;
+        rectangle(MyBackground,Point(MyBackground.cols-48,MyBackground.rows-18),Point(MyBackground.cols-102,MyBackground.rows-122),Scalar(0,200,200),2);
+        return;
+    }
+    putText(MyImage,QRMessage,Point(MyImage.cols-201,72),FONT_HERSHEY_PLAIN,1,Scalar(0,0,0),2);
+    rectangle(MyBackground,Point(MyBackground.cols-50,MyBackground.rows-20-10*count),Point(MyBackground.cols-100,MyBackground.rows-17-10*(count+1)),Scalar(50,205,50),-1);
+    count++;
 }

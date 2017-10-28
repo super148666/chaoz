@@ -63,7 +63,7 @@ endif ()
 
 add_executable(RosAria RosAria.cpp LaserPublisher.cpp)
 add_executable(tourGuide tourGuide.cpp StateDisplay.cpp StateDisplay.h QRDetect.cpp)
-add_executable(teleop teleop.cpp)
+add_executable(teleop ObstacleAvoid.cpp)
 #add_executable(obstacleAvoid ObstacleAvoid.cpp)
 add_dependencies(RosAria rosaria_gencfg)
 add_dependencies(RosAria rosaria_gencpp)
@@ -71,7 +71,7 @@ add_dependencies(RosAria rosaria_gencpp)
 target_link_libraries(RosAria ${catkin_LIBRARIES} ${Boost_LIBRARIES} Aria pthread dl rt)
 target_link_libraries(tourGuide ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} zbar pthread)
 target_link_libraries(teleop ${catkin_LIBRARIES} ${Boost_LIBRARIES} Aria pthread dl rt)
-#target_link_libraries(obstacleAvoid ${catkin_LIBARIES})
+#target_link_libraries(obstacleAvoid ${catkin_LIBARIES} ${Boost_LIBRARIES} Aria pthread dl rt)
 set_target_properties(RosAria PROPERTIES COMPILE_FLAGS "-fPIC")
 set_target_properties(tourGuide PROPERTIES COMPILE_FLAGS "-fPIC")
 #set_target_properties(obstacleAvoid PROPERTIES COMPILE_FLAGS "-fPIC")
@@ -99,6 +99,7 @@ install(
         RosAria
         tourGuide
         teleop
+#        obstacleAvoid
         ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
         LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
         RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}

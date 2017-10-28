@@ -9,24 +9,6 @@
 #include <signal.h>
 #include <termios.h>
 
-#define KEYCODE_R 100
-#define KEYCODE_L 97
-#define KEYCODE_U 119
-#define KEYCODE_D 115
-#define KEYCODE_Q 113
-#define KEYCODE_P 112
-#define KEYCODE_SPACE 32
-#define KEYCODE_RACE 114
-
-geometry_msgs::PoseWithCovarianceStamped::_pose_type::_pose_type g_currentPose;
-void positionMessageReceived(const geometry_msgs::PoseWithCovarianceStamped &msg){
-    g_currentPose = msg.pose.pose;
-}
-
-//nav_msgs::Odometry::_pose_type::_pose_type g_currentPose;
-//void positionMessageReceived(const nav_msgs::Odometry &msg){
-//    g_currentPose = msg.pose.pose;
-//}
 
 
 class TeleopRosAria
@@ -36,21 +18,14 @@ public:
     void keyLoop();
 private:
     ros::NodeHandle nh_;
-    double linear_, angular_, l_scale_, a_scale_;
     ros::Publisher twist_pub_;
     ros::Subscriber pose_sub_;
 };
-TeleopRosAria::TeleopRosAria():
-        linear_(0),
-        angular_(0),
-        l_scale_(2.0),
-        a_scale_(2.0)
+TeleopRosAria::TeleopRosAria()
 {
     nh_.param("scale_angular", a_scale_, a_scale_);
     nh_.param("scale_linear", l_scale_, l_scale_);
     twist_pub_ = nh_.advertise<geometry_msgs::Twist>("RosAria/cmd_vel", 1);
-    pose_sub_ = nh_.subscribe("robot_pose_ekf/odom_combined",1,&positionMessageReceived);
-//    pose_sub_ = nh_.subscribe("RosAria/pose",1,&positionMessageReceived);
 }
 int kfd = 0;
 struct termios cooked, raw;
@@ -62,15 +37,6 @@ void quit(int sig)
 }
 void TeleopRosAria::keyLoop()
 {
-    static bool raceMode = false;
-    l_scale_ = 5000;
-    a_scale_ = 500;
-    if(raceMode){
-        l_scale_ = 10000;
-        a_scale_ = 1000;
-    }
-
-    static int count = 0;
     char c;
     bool dirty=false;
     // get the console in raw mode
@@ -98,25 +64,25 @@ void TeleopRosAria::keyLoop()
         ROS_DEBUG("value: 0x%02X\n", c);
         switch(c)
         {
-            case KEYCODE_L:
+            case KEYCODE_A:
                 ROS_DEBUG("LEFT");
                 angular_ = 0.1;
                 linear_ = 0;
                 dirty = true;
                 break;
-            case KEYCODE_R:
+            case KEYCODE_D:
                 ROS_DEBUG("RIGHT");
                 angular_ = -0.1;
                 linear_ = 0;
                 dirty = true;
                 break;
-            case KEYCODE_U:
+            case KEYCODE_W:
                 ROS_DEBUG("UP");
                 linear_ = 0.1;
                 angular_ = 0;
                 dirty = true;
                 break;
-            case KEYCODE_D:
+            case KEYCODE_S:
                 ROS_DEBUG("DOWN");
                 linear_ = -0.1;
                 angular_ = 0;
@@ -134,19 +100,8 @@ void TeleopRosAria::keyLoop()
                 return;
                 break;
             case KEYCODE_P:
-                ros::spinOnce();
-                std::cout<<"g_waypoint["<<count<<"].x = "<<g_currentPose.position.x<<";"<<std::endl;
-                std::cout<<"g_waypoint["<<count<<"].y = "<<g_currentPose.position.y<<";"<<std::endl;
-                count++;
                 break;
-            case KEYCODE_RACE:
-                if(!raceMode){
-                    raceMode = true;
-                    std::cout<<"Race Mode ON!!"<<std::endl;
-                }else{
-                    raceMode = false;
-                    std::cout<<"Race Mode OFF."<<std::endl;
-                }
+            case KEYCODE_R:
                 break;
         }
         geometry_msgs::Twist twist;
@@ -160,11 +115,11 @@ void TeleopRosAria::keyLoop()
     }
     return;
 }
-int main(int argc, char** argv)
-{
-    ros::init(argc, argv, "teleop_RosAria");
-    TeleopRosAria teleop_RosAria;
-    signal(SIGINT,quit);
-    teleop_RosAria.keyLoop();
-    return(0);
-}
+//int main(int argc, char** argv)
+//{
+//    ros::init(argc, argv, "teleop_RosAria");
+//    TeleopRosAria teleop_RosAria;
+//    signal(SIGINT,quit);
+//    teleop_RosAria.keyLoop();
+//    return(0);
+//}

@@ -15,6 +15,8 @@
 #include <nav_msgs/Odometry.h>
 #include <opencv2/opencv.hpp>
 #include "opencv2/features2d/features2d.hpp"
+#include <opencv2/imgproc/imgproc.hpp>
+#include <zbar.h>
 
 #include <iostream>
 #include <string>
@@ -24,10 +26,11 @@
 #define COLOR_RED 2
 #define COLOR_GREEN 1
 #define COLOR_BLUE 0
-#define TIME_STEP 0.05
+#define TIME_STEP 0.5
 
 using namespace cv;
 using namespace std;
+using namespace zbar;
 
 class StateDisplay{
 private:
@@ -48,8 +51,10 @@ private:
     Vec3b colorGreen;
     int MyFrontLength;
     int MyHalfWidth;
+    VideoCapture cap;
+    ImageScanner scanner;
 public:
-    explicit StateDisplay();
+    explicit StateDisplay(int videoSrc);
     void DisplayImage();
     void DisplayBackground();
     void UpdateSurrounding(double* scan);
@@ -59,6 +64,8 @@ public:
     void AddLaserPoint(double dist, double ang, Scalar color);
     void Clear();
     void SaveImage(string name);
+    void AddRoomText(string QRMessage, bool clear = false);
+    string readQR();
 };
 
 #endif //ROSARIA_STATE_DISPLAY_H
