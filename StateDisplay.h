@@ -32,6 +32,9 @@ using namespace cv;
 using namespace std;
 using namespace zbar;
 
+extern double g_rightClosest;
+extern double g_leftClosest;
+
 class StateDisplay{
 private:
     Mat MyImage;
@@ -64,7 +67,7 @@ public:
     void AddLaserPoint(double dist, double ang, Scalar color);
     void Clear();
     void SaveImage(string name);
-    void AddRoomText(string QRMessage, bool clear = false);
+    int AddRoomText(string QRMessage, bool clear = false);
     string readQR();
 };
 

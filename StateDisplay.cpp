@@ -36,19 +36,19 @@ StateDisplay::StateDisplay(int videoSrc) {
                        (int) (2 * MyLaserMaxRange / MyScaleX) + 1, CV_8UC3, Scalar(255, 255, 255));
     rectangle(MyBackground, Point(MyRobotPosition.x - MyHalfWidth, MyRobotPosition.y),
               Point(MyRobotPosition.x + MyHalfWidth, MyRobotPosition.y - MyFrontLength), Scalar(0, 69, 255), -1);
-    circle(MyBackground, MyLaserPosition, MyLaserPosition.x, Scalar(0, 255, 0), 1);
-    rectangle(MyBackground,Point(1,1),Point(11,11),Scalar(0,255,0),-1);
-    rectangle(MyBackground,Point(1,13),Point(11,23),Scalar(0,255,255),-1);
-    rectangle(MyBackground,Point(1,25),Point(11,35),Scalar(255,0,0),-1);
-    rectangle(MyBackground,Point(1,37),Point(11,47),Scalar(0,69,255),-1);
-    rectangle(MyBackground,Point(1,49),Point(11,59),Scalar(0,0,0),-1);
-    rectangle(MyBackground,Point(1,61),Point(11,71),Scalar(255,0,255),-1);
-    putText(MyBackground, "8m Range", Point(11, 12), FONT_HERSHEY_PLAIN, 1, Scalar(0, 0, 0));
-    putText(MyBackground, "Open Space", Point(11, 24), FONT_HERSHEY_PLAIN, 1, Scalar(0, 0, 0));
-    putText(MyBackground, "Estimated Path", Point(11, 36), FONT_HERSHEY_PLAIN, 1, Scalar(0, 0, 0));
-    putText(MyBackground, "Pioneer 3at", Point(11, 48), FONT_HERSHEY_PLAIN, 1, Scalar(0, 0, 0));
-    putText(MyBackground, "Obstacle" , Point(11,60),FONT_HERSHEY_PLAIN, 1, Scalar(0,0,0));
-    putText(MyBackground, "Following Path", Point(11,72),FONT_HERSHEY_PLAIN,1,Scalar(0,0,0));
+    circle(MyBackground, MyLaserPosition, MyLaserPosition.x, Scalar(0, 255, 0), 2);
+    rectangle(MyBackground,Point(1,1),Point(21,23),Scalar(0,255,0),-1);
+    rectangle(MyBackground,Point(1,25),Point(21,47),Scalar(0,255,255),-1);
+    rectangle(MyBackground,Point(1,49),Point(21,71),Scalar(255,0,0),-1);
+    rectangle(MyBackground,Point(1,73),Point(21,95),Scalar(0,69,255),-1);
+    rectangle(MyBackground,Point(1,97),Point(21,119),Scalar(0,0,0),-1);
+    rectangle(MyBackground,Point(1,121),Point(21,143),Scalar(255,0,255),-1);
+    putText(MyBackground, "8m Range", Point(21, 24), FONT_HERSHEY_PLAIN, 2, Scalar(0, 0, 0));
+    putText(MyBackground, "Open Space", Point(21, 48), FONT_HERSHEY_PLAIN, 2, Scalar(0, 0, 0));
+    putText(MyBackground, "Estimated Path", Point(21, 72), FONT_HERSHEY_PLAIN, 2, Scalar(0, 0, 0));
+    putText(MyBackground, "Pioneer 3at", Point(21, 96), FONT_HERSHEY_PLAIN, 2, Scalar(0, 0, 0));
+    putText(MyBackground, "Obstacle" , Point(21,120),FONT_HERSHEY_PLAIN, 2, Scalar(0,0,0));
+    putText(MyBackground, "Following Path", Point(21,144),FONT_HERSHEY_PLAIN,2,Scalar(0,0,0));
 
     putText(MyBackground, "mm/s", Point(MyBackground.cols-51,12),FONT_HERSHEY_PLAIN,1,Scalar(0,0,0));
     putText(MyBackground, "deg/s", Point(MyBackground.cols-51,24),FONT_HERSHEY_PLAIN,1,Scalar(0,0,0));
@@ -69,6 +69,9 @@ StateDisplay::StateDisplay(int videoSrc) {
     }
     scanner.set_config(ZBAR_NONE, ZBAR_CFG_ENABLE, 1);
     namedWindow("MyVideo", CV_WINDOW_AUTOSIZE);
+
+    moveWindow(MyWindowName,0,0);
+    moveWindow("MyVideo", 4000,2000);
 }
 
 void StateDisplay::DisplayImage() {
@@ -114,11 +117,14 @@ void StateDisplay::UpdateSurrounding(double *scan) {
 }
 
 int StateDisplay::SearchFreeSpace(double *scan, double distThres, int countThres, double angle) {
-
     int count = 0;
     int mid = -1;
     int followMid = -1;
+    int followCount;
     double radToDegree = DEGREE_TO_RAD;
+    double dist;
+    g_leftClosest=20000.1;
+    g_rightClosest=20000.1;
     double rad;
     double sumRange = 0.0;
     double halfSumRange = 0.0;
@@ -155,9 +161,11 @@ int StateDisplay::SearchFreeSpace(double *scan, double distThres, int countThres
                                  ((int) (scan[mid] * sin(rad) / MyScaleY) + MyLaserPosition.y));
                 if (followMid == -1) {
                     followMid = mid;
+                    followCount = count;
                 }
                 if (abs(mid - angle) < abs(followMid - angle)) {
                     followMid = mid;
+                    followCount = count;
                 }
             }
             count = 0;
@@ -168,19 +176,51 @@ int StateDisplay::SearchFreeSpace(double *scan, double distThres, int countThres
 
     if (count > countThres && followMid == -1) {
         followMid = i - count / 2;
+        followCount = count;
         if (scan[followMid] > MyLaserMaxRange) {
             scan[followMid] = MyLaserMaxRange;
         }
     }
-    if (followMid >= 0) {
-        rad = -followMid * radToDegree;
-        midPoint = Point(((int) (scan[followMid] * cos(rad) / MyScaleX) + MyLaserPosition.x),
-                         ((int) (scan[followMid] * sin(rad) / MyScaleY) + MyLaserPosition.y));
-        line(MyImage, MyLaserPosition, midPoint, Scalar(255, 0, 255),2);
+    for(int i=0;i<followMid-followCount/2;i++){
+        if(i>60){
+            break;
+        }
+        if(scan[i]>distThres){
+            continue;
+        }
+        dist = scan[i]*cos(i*M_PI/180);
+        if(dist<g_rightClosest){
+            g_rightClosest = dist;
+        }
+    }
+    for(int i = followMid+followCount/2;i<181;i++){
+        if(i<120){
+            i=120;
+        }
+        if(scan[i]>distThres){
+            continue;
+        }
+        dist = scan[i]*cos((180-i)*M_PI/180);
+        if(dist<g_leftClosest){
+           g_leftClosest = dist;
+        }
+    }
+
+    if(g_rightClosest<distThres||g_leftClosest<distThres){
+        double closest = g_rightClosest<g_leftClosest? g_rightClosest:g_leftClosest;
+        double ratio = (-g_rightClosest+g_leftClosest)/closest;
+        if(ratio>1) ratio = 1;
+        if(ratio<-1) ratio = -1;
+        followMid += ratio*(followCount/2);
+        cout<<"ratio:"<<ratio<<" closest:"<<closest<<endl;
     }
 
     stringstream strstream;
     if(followMid!=-1){
+        rad = -followMid * radToDegree;
+        midPoint = Point(((int) (scan[followMid] * cos(rad) / MyScaleX) + MyLaserPosition.x),
+                         ((int) (scan[followMid] * sin(rad) / MyScaleY) + MyLaserPosition.y));
+        line(MyImage, MyLaserPosition, midPoint, Scalar(255, 0, 255),2);
         if(followMid<90&&followMid>=10) strstream<<"   "<<(90-followMid);
         if(followMid<10) strstream<<"    "<<(90-followMid);
         if(followMid>=100) strstream<<"  -"<<(followMid-90);
@@ -308,14 +348,16 @@ string StateDisplay::readQR() {
     return result;
 }
 
-void StateDisplay::AddRoomText(string QRMessage,bool clear){
+int StateDisplay::AddRoomText(string QRMessage,bool clear){
     static int count = 0;
     if(clear){
         count = 0;
+        rectangle(MyBackground,Point(MyBackground.cols-48,MyBackground.rows-18),Point(MyBackground.cols-102,MyBackground.rows-122),Scalar(255,255,255),-1);
         rectangle(MyBackground,Point(MyBackground.cols-48,MyBackground.rows-18),Point(MyBackground.cols-102,MyBackground.rows-122),Scalar(0,200,200),2);
-        return;
+        return count;
     }
     putText(MyImage,QRMessage,Point(MyImage.cols-201,72),FONT_HERSHEY_PLAIN,1,Scalar(0,0,0),2);
     rectangle(MyBackground,Point(MyBackground.cols-50,MyBackground.rows-20-10*count),Point(MyBackground.cols-100,MyBackground.rows-17-10*(count+1)),Scalar(50,205,50),-1);
     count++;
+    return count;
 }

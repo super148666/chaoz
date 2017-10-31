@@ -77,6 +77,6 @@ int main(int argc, char **argv) {
     while(ros::ok()){
         ros::spinOnce();
         GetWinner();
-        ros::Duration(0.05).sleep();
+        ros::Duration(0.1).sleep();
     }return (0);
 }

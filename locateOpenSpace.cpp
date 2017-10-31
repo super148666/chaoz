@@ -5,16 +5,13 @@
 #include <sensor_msgs/LaserScan.h>
 #include <geometry_msgs/Twist.h>
 #include <nav_msgs/Odometry.h>
-#include <ctime>
-#include <cstdlib>
-
 
 double g_scan[181];
-nav_msgs::Odometry::_pose_type::_pose_type g_currentPose;
 geometry_msgs::Twist g_msg;
 bool g_leftOpen = false;
 bool g_rightOpen = false;
 bool g_frontOpen = false;
+nav_msgs::Odometry::_pose_type::_pose_type g_currentPose;
 double g_linear;
 double g_angular;
 double g_closestDist;
@@ -151,8 +148,6 @@ void poseMessageReceived(const nav_msgs::Odometry &msg) {
 }
 
 int main(int argc, char **argv) {
-    srand(time(NULL));
-
     ros::init(argc, argv, "locateOpenSpace");
     ros::NodeHandle nh;
 

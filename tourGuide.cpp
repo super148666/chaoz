@@ -29,15 +29,21 @@
 nav_msgs::Odometry::_pose_type::_pose_type g_currentPose;
 StateDisplay displayer(1);
 double g_scan[181];
+double g_scanRaw[181];
 ros::Publisher pub;
 double g_linear = 0.0;
 double g_angular = 0.0;
+double g_rightClosest;
+double g_leftClosest;
 bool g_leftOpen = false;
 bool g_rightOpen = false;
 bool g_frontOpen = false;
-int kfd = 0;
-struct termios cooked, raw;
+bool g_tourFinished = false;
+bool g_narrowDoorMet = false;
+bool g_returned = false;
 VideoCapture g_cap;
+Point g_narrowDoor;
+Point g_now;
 
 class MotionDetector {
 public:
@@ -95,7 +101,7 @@ private:
 
 void keyLoop();
 
-geometry_msgs::Twist *DriveFreeSpace();
+geometry_msgs::Twist *DriveFreeSpace(bool clearVisited = false);
 
 void poseMessageReceived(const nav_msgs::Odometry &msg);
 
@@ -145,6 +151,7 @@ void poseMessageReceived(const nav_msgs::Odometry &msg) {
     g_currentPose = msg.pose.pose;
     g_linear = msg.twist.twist.linear.x;
     g_angular = msg.twist.twist.angular.z;
+    g_now = Point((int)(g_currentPose.position.x*1000),(int)(g_currentPose.position.y*1000));
     g_currentPose.orientation.w = atan2(g_currentPose.orientation.z, g_currentPose.orientation.w) * 2 / M_PI * 180;
     if (g_currentPose.orientation.w < -180) {
         g_currentPose.orientation.w += 360;
@@ -159,7 +166,8 @@ void laserMessageReceived(const sensor_msgs::LaserScan &msg) {
     int index = 0;
     for (int i = 90; i < 451; i = i + 2) {
         index = (i - 90) / 2;
-        g_scan[index] = msg.ranges[i] * 1000.0;
+        g_scanRaw[index] = msg.ranges[i] * 1000.0;
+        g_scan[index] = g_scanRaw[index];
     }
     g_rightOpen = false;
     g_leftOpen = false;
@@ -186,22 +194,30 @@ void laserMessageReceived(const sensor_msgs::LaserScan &msg) {
     RightDetect();
 }
 
-geometry_msgs::Twist *DriveFreeSpace() {
+geometry_msgs::Twist *DriveFreeSpace(bool clearVisited) {
     int mid;
     static set<string> visited;
     geometry_msgs::Twist *msg = new geometry_msgs::Twist;
+    if(clearVisited){
+        visited.clear();
+        return msg;
+    }
     msg->linear.y = msg->linear.z = msg->linear.x = 0.0;
     msg->angular.x = msg->angular.y = msg->angular.z = 0.0;
     ros::spinOnce();
     displayer.Clear();
     displayer.UpdateSurrounding(g_scan);
-    mid = displayer.SearchFreeSpace(g_scan, 2000, 20, 90);
+    mid = displayer.SearchFreeSpace(g_scan, 2500, 15, 90);
+    if (g_leftOpen) {
+        if (mid < 80)
+            mid = displayer.SearchFreeSpace(g_scan, 2500, 15, 180);
+    }
+    if (g_frontOpen){
+        mid = displayer.SearchFreeSpace(g_scan,2500,15,90);
+    }
     if (g_rightOpen) {
         if (mid > 100)
-            mid = displayer.SearchFreeSpace(g_scan, 2000, 20, 0);
-    } else if (g_leftOpen) {
-        if (mid < 80)
-            mid = displayer.SearchFreeSpace(g_scan, 2000, 20, 180);
+            mid = displayer.SearchFreeSpace(g_scan, 2500, 15, 0);
     }
     displayer.MotionEstimate(g_linear, g_angular);
     for (int i = 0; i < 1; i++) {
@@ -215,18 +231,37 @@ geometry_msgs::Twist *DriveFreeSpace() {
                 displayer.Clear();
                 displayer.UpdateSurrounding(g_scan);
                 displayer.MotionEstimate(g_linear, g_angular);
-                displayer.AddRoomText(QRMessage);
+                if(displayer.AddRoomText(QRMessage)==10) g_tourFinished = true;
                 displayer.DisplayImage();
                 stringstream strstream;
                 strstream<<"echo \"this is, "<<QRMessage.c_str()<<"\"|festival --tts";
+                moveWindow("MyVideo",0,0);
+                waitKey(5);
                 system(strstream.str().c_str());
-                cout << "get code: " << QRMessage << endl;
                 waitKey(500);
+                moveWindow("MyVideo",4000,2000);
+                if(g_tourFinished) {
+                    displayer.DisplayImage();
+                    stringstream strstream;
+                    strstream<<"echo \"tour is finised! I will return to start position!\"|festival --tts";
+                    waitKey(5);
+                    system(strstream.str().c_str());
+                    waitKey(2000);
+                }
             }
         }
     }
     displayer.DisplayImage();
+
     msg->linear.x = 0.25;
+    if(g_tourFinished) {
+        msg->linear.x = 1.0;
+        if(g_rightClosest<400&&g_leftClosest<400){
+            g_narrowDoorMet = true;
+            g_narrowDoor = Point(g_now.x,g_now.y);
+            msg->linear.x = 0;
+        }
+    }
 //    for (int i = 75; i < 105; i++) {
 //        if (g_scan[i] < 650) {
 //            msg->linear.x = 0;
@@ -240,33 +275,33 @@ geometry_msgs::Twist *DriveFreeSpace() {
     }
     mid = (mid - 90);
     msg->angular.z = mid;
-    if (mid > 0) {
+//    if (mid > 0) {
 //        for (int i = 180; i > 90; i--) {
 //            if (g_scan[i] < 500) {
 //                msg->linear.x = 0;
 //            }
 //        }
-    }
-    if (mid > 30) {
-        msg->linear.x /= 0.20;
-    }
-    if (mid > 60) {
-        msg->linear.x /= 0.15;
-    }
+//    }
+//    if (mid > 30) {
+//        msg->linear.x /= 0.20;
+//    }
+//    if (mid > 60) {
+//        msg->linear.x /= 0.15;
+//    }
 
-    if (mid < 0) {
+//    if (mid < 0) {
 //        for (int i = 45; i < 90; i++) {
 //            if (g_scan[i] < 400) {
 //                msg->linear.x = 0;
 //            }
 //        }
-    }
-    if (mid < -30) {
-        msg->linear.x /= 0.2;
-    }
-    if (mid < -60) {
-        msg->linear.x /= 0.15;
-    }
+//    }
+//    if (mid < -30) {
+//        msg->linear.x /= 0.2;
+//    }
+//    if (mid < -60) {
+//        msg->linear.x /= 0.15;
+//    }
 //    for (int i = 45; i < 135; i++) {
 //        if (g_scan[i] < 400) {
 //            msg->linear.x = 0;
@@ -274,6 +309,13 @@ geometry_msgs::Twist *DriveFreeSpace() {
 //        }
 //    }
     msg->angular.z = (msg->linear.x == 0) && (g_linear != 0) ? 0 : msg->angular.z;
+    if(msg->angular.z>45){
+        msg->angular.z = 45;
+    }
+    if(msg->angular.z<-45){
+        msg->angular.z = -45;
+    }
+
     return msg;
 }
 
@@ -350,6 +392,7 @@ int RightDetect() {
 
 void keyLoop() {
     int c;
+    bool buildWindow = false;
     bool deadManSwitch = true;
     bool dirty = false;
     bool motion = false;
@@ -428,15 +471,32 @@ void keyLoop() {
             }
         } else {
             if (firstStart) {
-                namedWindow("webcam", WINDOW_NORMAL);
-                resizeWindow("webcam", frame.cols, frame.rows);
-                do {
-                    imshow("webcam", frame);
+                waitKey(50);
+                system("echo \"Ready , for , tour .\"|festival --tts");
+                waitKey(50);
+                if(!buildWindow) {
+                    namedWindow("webcam", WINDOW_NORMAL);
+                    resizeWindow("webcam", frame.cols, frame.rows);
+                    buildWindow = true;
+                }
+                moveWindow("webcam",0,0);
+                for (int i = 0; i < 10; i++) {
                     g_cap >> frame;
                     if (frame.empty()) break; // end of video stream
                     resize(frame, frame, frameSize);
+                    motionDetector.Detect(&frame);
+                    imshow("webcam", frame);
+                    waitKey(50);
+                }
+                do {
+                    g_cap >> frame;
+                    if (frame.empty()) break; // end of video stream
+                    resize(frame, frame, frameSize);
+                    imshow("webcam", frame);
+                    waitKey(5);
                 } while (motionDetector.Detect(&frame) > 10);
                 firstStart = false;
+                motion = false;
             }
             while (!motion) {
                 g_cap >> frame;
@@ -448,17 +508,16 @@ void keyLoop() {
                 if (motion) {
                     motion = false;
                     system("echo \"Hey! would you like to start a tour\"|festival --tts");
-                    // play sound to ask
                     cout << "first motion" << endl;
+                    system("echo \"wave your hand ,to start a tour\"|festival --tts");
                     for (int i = 0; i < 10; i++) {
                         g_cap >> frame;
                         if (frame.empty()) break; // end of video stream
                         resize(frame, frame, frameSize);
                         motionDetector.Detect(&frame);
                         imshow("webcam", frame);
-                        waitKey(5);
+                        waitKey(50);
                     }
-                    system("echo \"wave your hand ,to start a tour\"|festival --tts");
                     while (!motion) {
                         g_cap >> frame;
                         if (frame.empty()) break; // end of video stream
@@ -469,12 +528,44 @@ void keyLoop() {
                     }
                     system("echo \"let's begin\"|festival --tts");
                     cout << "second motion" << endl;
-                    destroyWindow("webcam");
+                    moveWindow("webcam",4000,2000);
+                    waitKey(1);
                 }
             }
             do {
                 c = waitKey(5);
-                pub.publish(*DriveFreeSpace());
+                if(!g_narrowDoorMet) pub.publish(*DriveFreeSpace());
+                else{
+                    ros::spinOnce();
+                    if(g_returned){
+                        if(g_scan[90]<10000) {
+                            twist.linear.x = 0;
+                            twist.angular.z = -20;
+                        }else{
+                            twist.linear.x = 0;
+                            twist.angular.z = 0;
+                            g_returned = false;
+                            g_narrowDoorMet = false;
+                            g_tourFinished = false;
+                            displayer.AddRoomText(" ", true);
+                            DriveFreeSpace(true);
+                            firstStart = true;
+                            waitKey(500);
+                            break;
+                        }
+                    }else {
+                        twist.linear.x = 1;
+                        twist.angular.z = 0;
+                        if (norm(g_narrowDoor - g_now) > 4000) {
+                            g_returned = true;
+                        }
+                    }
+                    displayer.Clear();
+                    displayer.UpdateSurrounding(g_scan);
+                    displayer.MotionEstimate(g_linear,g_angular);
+                    displayer.DisplayImage();
+                    pub.publish(twist);
+                }
             } while (c == -1);
             switch (c) {
                 case KEYCODE_T:

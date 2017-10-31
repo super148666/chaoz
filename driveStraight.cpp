@@ -5,9 +5,6 @@
 #include <sensor_msgs/LaserScan.h>
 #include <geometry_msgs/Twist.h>
 #include <nav_msgs/Odometry.h>
-#include <opencv2/opencv.hpp>
-#include <ctime>
-#include <cstdlib>
 
 
 geometry_msgs::Twist g_msg;
@@ -22,7 +19,6 @@ void GetObjectiveValue(){
 }
 
 int main(int argc, char **argv) {
-    srand(time(NULL));
 
     ros::init(argc, argv, "driveStraight");
     ros::NodeHandle nh;

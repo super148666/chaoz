@@ -277,7 +277,7 @@ RosAriaNode::RosAriaNode(ros::NodeHandle nh) :
         sonar_enabled(false), publish_sonar(false), publish_sonar_pointcloud2(false),
         debug_aria(false),
         TicksMM(-1), DriftFactor(-99999), RevCount(-1),
-        publish_aria_lasers(false) {
+        publish_aria_lasers(true) {
     for (int i = 0; i < 36; i++) {
         MyCovariance[i] = 0;
     }
@@ -302,7 +302,7 @@ RosAriaNode::RosAriaNode(ros::NodeHandle nh) :
     n.param("aria_log_filename", aria_log_filename, std::string("Aria.log"));
 
     // whether to connect to lasers using aria
-    n.param("publish_aria_lasers", publish_aria_lasers, false);
+    n.param("publish_aria_lasers", publish_aria_lasers, true);
 
     // Get frame_ids to use.
     n.param("odom_frame", frame_id_odom, std::string("odom"));
@@ -514,10 +514,11 @@ int RosAriaNode::Setup() {
     cmdvel_timeout = ros::Duration(cmdvel_timeout_param);
     if (cmdvel_timeout_param > 0.0)
         cmdvel_watchdog_timer = n.createTimer(ros::Duration(0.1), &RosAriaNode::cmdvel_watchdog, this);
-
-//    robot->moveTo(ArPose(0,0,0));
-//    std::cout<<"init position x:"<<robot->getX()<<" y:"<<robot->getY()<<" th:"<<robot->getTh()<<std::endl;
-//    ROS_INFO_NAMED("rosaria", "rosaria: Setup complete");
+    robot->setTransDecel(1000);
+    std::cout<<"transDel:"<<robot->getTransDecel()<<" maxtransDel:"<<robot->getAbsoluteMaxTransDecel()<<std::endl;
+//    robot->moveTo(ArPose(9000,5000,90));
+//    std::cout<<"init position x:"<<robot->getPose().getX()<<" y:"<<robot->getPose().getY()<<" th:"<<robot->getPose().getTh()<<std::endl;
+    ROS_INFO_NAMED("rosaria", "rosaria: Setup complete");
     return 0;
 }
 
