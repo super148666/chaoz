@@ -515,9 +515,9 @@ int RosAriaNode::Setup() {
     if (cmdvel_timeout_param > 0.0)
         cmdvel_watchdog_timer = n.createTimer(ros::Duration(0.1), &RosAriaNode::cmdvel_watchdog, this);
 
-    robot->moveTo(ArPose(0,0,0));
-    std::cout<<"init position x:"<<robot->getX()<<" y:"<<robot->getY()<<" th:"<<robot->getTh()<<std::endl;
-    ROS_INFO_NAMED("rosaria", "rosaria: Setup complete");
+//    robot->moveTo(ArPose(0,0,0));
+//    std::cout<<"init position x:"<<robot->getX()<<" y:"<<robot->getY()<<" th:"<<robot->getTh()<<std::endl;
+//    ROS_INFO_NAMED("rosaria", "rosaria: Setup complete");
     return 0;
 }
 

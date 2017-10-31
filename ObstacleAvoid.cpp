@@ -5,7 +5,6 @@
 #include <sensor_msgs/LaserScan.h>
 #include <geometry_msgs/Twist.h>
 #include <nav_msgs/Odometry.h>
-#include <iostream>
 
 double g_scan[181];
 nav_msgs::Odometry::_pose_type::_pose_type g_currentPose;
@@ -14,41 +13,54 @@ double g_linear;
 double g_angular;
 ros::Publisher pub;
 
-double GetObjectiveValue(){
-    bool leftObstacle = false;
-    bool rightObstacle = false;
-    bool frontObstacle = false;
+void GetObjectiveValue(){
     double leftClosestDist = 20000.1;
     double rightClosestDist = 20000.1;
     double frontClosestDist = 20000.1;
-    double leftObjective;
-    double rightObjective;
-    double frontObjective;
+    double dist;
     for(int i=0;i<60;i++){
-        if(g_scan[i]<rightClosestDist){
-            rightClosestDist = g_scan[i];
-            rightObstacle = true;
+        dist = g_scan[i]*cos(i * M_PI/180);
+        if(dist<rightClosestDist){
+            rightClosestDist = dist;
         }
     }
     for(int i=60;i<121;i++){
-        if(g_scan[i]<frontClosestDist){
-            frontClosestDist = g_scan[i];
-            frontObstacle = true;
+        dist = g_scan[i] * cos(abs(90-i)*M_PI/180);
+        if(dist<frontClosestDist){
+            frontClosestDist = dist;
         }
     }
     for(int i=121;i<181;i++){
-        if(g_scan[i]<leftClosestDist){
-            leftClosestDist = g_scan[i];
-            leftObstacle = true;
+        dist = g_scan[i]*cos((180-i) * M_PI/180);
+        if(dist<leftClosestDist){
+            leftClosestDist = dist;
         }
     }
-
-
+    g_msg.linear.z = 0;
+    if(rightClosestDist<350){
+        g_msg.angular.z = 90;
+        g_msg.linear.x = g_linear / 2;
+        g_msg.linear.z = 1.1;
+    }
+    if(leftClosestDist<350){
+        g_msg.angular.z = -90;
+        g_msg.linear.x = g_linear / 2;
+        g_msg.linear.z = 1.1;
+    }
+    if(rightClosestDist<350&&leftClosestDist<350){
+        g_msg.linear.x = 0;
+        g_msg.angular.z = g_scan[0]<g_scan[180]? 90:-90;
+        g_msg.linear.z = 1.1;
+    }
+    if(frontClosestDist<600){
+        g_msg.linear.x = 0;
+        g_msg.angular.z = g_scan[0]<g_scan[180]? 90:-90;
+        g_msg.linear.z = 1.1;
+    }
 }
 
 void laserMessageReceived(const sensor_msgs::LaserScan &msg) {
     int index = 0;
-    int count;
     for (int i = 90; i < 451; i = i + 2) {
         index = (i - 90) / 2;
         g_scan[index] = msg.ranges[i] * 1000.0;
@@ -73,15 +85,22 @@ int main(int argc, char **argv) {
     ros::init(argc, argv, "obstacleAvoid");
     ros::NodeHandle nh;
 
-    pub = nh.advertise<geometry_msgs::Twist>("obstacleAvoid/offer", 1);
-    geometry_msgs::Twist msg;
-    std::cout << "publisher to cmd_vel done" << std::endl;
+    pub = nh.advertise<geometry_msgs::Twist>("offer1", 1000);
     ros::Subscriber laser;
     ros::Subscriber pose;
-    laser = nh.subscribe("RosAria/sim_lms1xx_1_laserscan", 1, &laserMessageReceived);
+    laser = nh.subscribe("RosAria/sim_lms1xx_1_laserscan", 1000, &laserMessageReceived);
     pose = nh.subscribe("RosAria/pose", 1000, &poseMessageReceived);
     std::cout << "subscriber to laserscan done" << std::endl;
+    g_msg.linear.x = 0.0;
+    g_msg.linear.y = 0.0;
+    g_msg.linear.z = 0.0;
+    g_msg.angular.x = 0.0;
+    g_msg.angular.y = 0.0;
+    g_msg.angular.z = 0.0;
     pub.publish(g_msg);
-    ros::spin();
-    return (0);
+    while(ros::ok()){
+        ros::spinOnce();
+        GetObjectiveValue();
+        pub.publish(g_msg);
+    }return (0);
 }

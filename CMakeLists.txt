@@ -43,8 +43,7 @@ generate_dynamic_reconfigure_options(cfg/RosAria.cfg)
 #target_link_libraries(${PROJECT_NAME} another_library)
 find_package(OpenCV REQUIRED)
 find_package(Boost REQUIRED COMPONENTS thread)
-include_directories(${catkin_INCLUDE_DIRS} ${Boost_INCLUDE_DIRS} ${ZBAR_INCLUDE_DIRS})
-include_directories(${OpenCV_INCLUDE_DIRS})
+include_directories(${catkin_INCLUDE_DIRS} ${Boost_INCLUDE_DIRS} ${ZBAR_INCLUDE_DIRS} ${OpenCV_INCLUDE_DIRS})
 find_package(Aria QUIET)
 if (Aria_FOUND)
     if (EXISTS "${Aria_INCLUDE_DIRS}/Aria.h")
@@ -63,18 +62,23 @@ endif ()
 
 add_executable(RosAria RosAria.cpp LaserPublisher.cpp)
 add_executable(tourGuide tourGuide.cpp StateDisplay.cpp StateDisplay.h QRDetect.cpp)
-add_executable(teleop ObstacleAvoid.cpp)
-#add_executable(obstacleAvoid ObstacleAvoid.cpp)
+add_executable(behavior1 ObstacleAvoid.cpp)
+add_executable(behavior2 locateOpenSpace.cpp)
+add_executable(behavior3 driveStraight.cpp)
+add_executable(behavior4 avoidPass.cpp)
+add_executable(auctioner auctioner.cpp)
 add_dependencies(RosAria rosaria_gencfg)
 add_dependencies(RosAria rosaria_gencpp)
 
 target_link_libraries(RosAria ${catkin_LIBRARIES} ${Boost_LIBRARIES} Aria pthread dl rt)
 target_link_libraries(tourGuide ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} zbar pthread)
-target_link_libraries(teleop ${catkin_LIBRARIES} ${Boost_LIBRARIES} Aria pthread dl rt)
-#target_link_libraries(obstacleAvoid ${catkin_LIBARIES} ${Boost_LIBRARIES} Aria pthread dl rt)
+target_link_libraries(behavior1 ${catkin_LIBRARIES})
+target_link_libraries(behavior2 ${catkin_LIBRARIES})
+target_link_libraries(behavior3 ${catkin_LIBRARIES})
+target_link_libraries(behavior4 ${catkin_LIBRARIES})
+target_link_libraries(auctioner ${catkin_LIBRARIES})
 set_target_properties(RosAria PROPERTIES COMPILE_FLAGS "-fPIC")
 set_target_properties(tourGuide PROPERTIES COMPILE_FLAGS "-fPIC")
-#set_target_properties(obstacleAvoid PROPERTIES COMPILE_FLAGS "-fPIC")
 #set_target_properties(RosAria PROPERTIES LINK_FLAGS "-Wl")
 
 ## Generate added messages and services with any dependencies listed here
@@ -98,7 +102,10 @@ install(
         TARGETS
         RosAria
         tourGuide
-        teleop
+#        behavior1
+#        behavior2
+#        behavior3
+#        behavior4
 #        obstacleAvoid
         ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
         LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}

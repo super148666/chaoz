@@ -6,7 +6,6 @@
 #include <fstream>
 #include <signal.h>
 #include <termios.h>
-//#include "QRDetect.cpp"
 #include "StateDisplay.h"
 
 #define KEYCODE_D 100
@@ -28,7 +27,7 @@
 #define NUM_STOP 1
 
 nav_msgs::Odometry::_pose_type::_pose_type g_currentPose;
-StateDisplay displayer(0);
+StateDisplay displayer(1);
 double g_scan[181];
 ros::Publisher pub;
 double g_linear = 0.0;
@@ -71,15 +70,15 @@ public:
         imshow("background", background);
     }
 
-    int Detect(Mat* frame) {
-        int count=0;
-        this->bgSubtractor.operator()(*frame,this->foreground);
+    int Detect(Mat *frame) {
+        int count = 0;
+        this->bgSubtractor.operator()(*frame, this->foreground);
         this->bgSubtractor.getBackgroundImage(this->background);
         erode(this->foreground, this->foreground, Mat());
         dilate(this->foreground, this->foreground, Mat());
         findContours(this->foreground, this->contours, CV_RETR_EXTERNAL, CV_CHAIN_APPROX_NONE);
         drawContours(*frame, this->contours, -1, Scalar(0, 0, 255), 2);
-        for(vector<vector<Point> >::iterator it = this->contours.begin();it!=this->contours.end();it++){
+        for (vector<vector<Point> >::iterator it = this->contours.begin(); it != this->contours.end(); it++) {
             count += (*it).size();
         }
 //        cout<<count<<endl;
@@ -108,7 +107,7 @@ int RightDetect();
 
 int main(int argc, char **argv) {
 //    InitGlobalVariables();
-    if (!g_cap.open(1)) {
+    if (!g_cap.open(0)) {
         cout << "Unable to open webcam\n";
         exit(EXIT_FAILURE);
     }
@@ -137,7 +136,6 @@ int main(int argc, char **argv) {
     cout << "configure state display done" << endl;
 
 
-
     keyLoop();
 
     return (0);
@@ -163,6 +161,9 @@ void laserMessageReceived(const sensor_msgs::LaserScan &msg) {
         index = (i - 90) / 2;
         g_scan[index] = msg.ranges[i] * 1000.0;
     }
+    g_rightOpen = false;
+    g_leftOpen = false;
+    g_frontOpen = false;
     for (int i = 0; i < 60; i++) {
         if (g_scan[i] > 8000) {
             g_rightOpen = true;
@@ -187,7 +188,7 @@ void laserMessageReceived(const sensor_msgs::LaserScan &msg) {
 
 geometry_msgs::Twist *DriveFreeSpace() {
     int mid;
-    static set <string> visited;
+    static set<string> visited;
     geometry_msgs::Twist *msg = new geometry_msgs::Twist;
     msg->linear.y = msg->linear.z = msg->linear.x = 0.0;
     msg->angular.x = msg->angular.y = msg->angular.z = 0.0;
@@ -196,31 +197,31 @@ geometry_msgs::Twist *DriveFreeSpace() {
     displayer.UpdateSurrounding(g_scan);
     mid = displayer.SearchFreeSpace(g_scan, 2000, 20, 90);
     if (g_rightOpen) {
-//        cout<<"right"<<endl;
-        if(mid>100)
-        mid = displayer.SearchFreeSpace(g_scan, 2000, 20, 0);
+        if (mid > 100)
+            mid = displayer.SearchFreeSpace(g_scan, 2000, 20, 0);
     } else if (g_leftOpen) {
-//        cout<<"left"<<endl;
-        if(mid<80)
-        mid = displayer.SearchFreeSpace(g_scan, 2000, 20, 180);
+        if (mid < 80)
+            mid = displayer.SearchFreeSpace(g_scan, 2000, 20, 180);
     }
-    displayer.MotionEstimate(g_linear,g_angular);
-    for(int i=0;i<1;i++) {
+    displayer.MotionEstimate(g_linear, g_angular);
+    for (int i = 0; i < 1; i++) {
         string QRMessage = displayer.readQR();
         if (!QRMessage.empty()) {
             //check if it's in the visited set
-            if(!(visited.find(QRMessage) != visited.end())){
+            if (!(visited.find(QRMessage) != visited.end())) {
                 visited.insert(QRMessage);
                 pub.publish(*msg);
                 ros::spinOnce();
                 displayer.Clear();
                 displayer.UpdateSurrounding(g_scan);
-                displayer.MotionEstimate(g_linear,g_angular);
+                displayer.MotionEstimate(g_linear, g_angular);
                 displayer.AddRoomText(QRMessage);
                 displayer.DisplayImage();
-                system("play -q /usr/local/Aria/examples/sound-computers.wav");
+                stringstream strstream;
+                strstream<<"echo \"this is, "<<QRMessage.c_str()<<"\"|festival --tts";
+                system(strstream.str().c_str());
                 cout << "get code: " << QRMessage << endl;
-                sleep(2);
+                waitKey(500);
             }
         }
     }
@@ -350,12 +351,12 @@ int RightDetect() {
 void keyLoop() {
     int c;
     bool deadManSwitch = true;
-    bool dirty=false;
+    bool dirty = false;
     bool motion = false;
     bool firstStart = true;
     geometry_msgs::Twist twist;
     Mat frame;
-    g_cap>>frame;
+    g_cap >> frame;
     Size frameSize(40, 30);
     MotionDetector motionDetector = MotionDetector(SUBTRACT_HISTORY, SUBTRACT_THRESHOLD);
     // get the console in raw mode
@@ -364,19 +365,18 @@ void keyLoop() {
     puts("Use arrow keys to move the robot.");
     puts("Press the space bar to stop the robot.");
     puts("Press q to stop the program");
-    for(;;)
-    {
+    for (;;) {
         ros::spinOnce();
-        c=waitKey(1);
-        if(deadManSwitch) {
-            do{
-                c = waitKey(3);
+        c = waitKey(5);
+        if (deadManSwitch) {
+            do {
+                c = waitKey(5);
                 displayer.Clear();
                 ros::spinOnce();
                 displayer.UpdateSurrounding(g_scan);
-                displayer.MotionEstimate(g_linear,g_angular);
+                displayer.MotionEstimate(g_linear, g_angular);
                 displayer.DisplayImage();
-            }while(c==-1);
+            } while (c == -1);
             switch (c) {
                 case KEYCODE_A:
                     ROS_DEBUG("LEFT");
@@ -415,7 +415,7 @@ void keyLoop() {
                     break;
                 case KEYCODE_T:
                     ROS_INFO("DEAD_MAN_SWITCH : OFF");
-                    displayer.AddRoomText(" ",true);
+                    displayer.AddRoomText(" ", true);
                     deadManSwitch = false;
                     firstStart = true;
                     break;
@@ -426,8 +426,8 @@ void keyLoop() {
                 pub.publish(twist);
                 dirty = false;
             }
-        }else{
-            if(firstStart){
+        } else {
+            if (firstStart) {
                 namedWindow("webcam", WINDOW_NORMAL);
                 resizeWindow("webcam", frame.cols, frame.rows);
                 do {
@@ -435,47 +435,48 @@ void keyLoop() {
                     g_cap >> frame;
                     if (frame.empty()) break; // end of video stream
                     resize(frame, frame, frameSize);
-                }while(motionDetector.Detect(&frame)>10);
+                } while (motionDetector.Detect(&frame) > 10);
                 firstStart = false;
             }
             while (!motion) {
                 g_cap >> frame;
                 if (frame.empty()) break; // end of video stream
                 resize(frame, frame, frameSize);
-                if(motionDetector.Detect(&frame)>50) motion = true;
+                if (motionDetector.Detect(&frame) > 50) motion = true;
                 imshow("webcam", frame);
                 waitKey(1);
-                if(motion){
+                if (motion) {
                     motion = false;
-                    system("play -q /usr/local/Aria/examples/sound-computers.wav");
+                    system("echo \"Hey! would you like to start a tour\"|festival --tts");
                     // play sound to ask
-                    cout<<"first motion"<<endl;
-                    for(int i=0;i<50;i++){
+                    cout << "first motion" << endl;
+                    for (int i = 0; i < 10; i++) {
                         g_cap >> frame;
                         if (frame.empty()) break; // end of video stream
                         resize(frame, frame, frameSize);
                         motionDetector.Detect(&frame);
                         imshow("webcam", frame);
-                        waitKey(1);
+                        waitKey(5);
                     }
+                    system("echo \"wave your hand ,to start a tour\"|festival --tts");
                     while (!motion) {
                         g_cap >> frame;
                         if (frame.empty()) break; // end of video stream
                         resize(frame, frame, frameSize);
-                        if(motionDetector.Detect(&frame)>15) motion = true;
+                        if (motionDetector.Detect(&frame) > 15) motion = true;
                         imshow("webcam", frame);
-                        waitKey(1);
+                        waitKey(5);
                     }
-                    cout<<"second motion"<<endl;
+                    system("echo \"let's begin\"|festival --tts");
+                    cout << "second motion" << endl;
                     destroyWindow("webcam");
                 }
             }
-            do{
-                c = waitKey(3);
+            do {
+                c = waitKey(5);
                 pub.publish(*DriveFreeSpace());
-            }while(c==-1);
-            switch(c)
-            {
+            } while (c == -1);
+            switch (c) {
                 case KEYCODE_T:
                     ROS_INFO("DEAD_MAN_SWITCH : ON");
                     deadManSwitch = true;

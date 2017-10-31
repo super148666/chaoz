@@ -75,7 +75,7 @@ void StateDisplay::DisplayImage() {
     rectangle(MyImage, Point(MyRobotPosition.x - MyHalfWidth, MyRobotPosition.y),
               Point(MyRobotPosition.x + MyHalfWidth, MyRobotPosition.y - MyFrontLength), Scalar(0, 0, 255), -1);
     imshow(MyWindowName, MyImage);
-    waitKey(10);
+    waitKey(5);
 }
 
 void StateDisplay::DisplayBackground() {
